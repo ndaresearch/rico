@@ -1,7 +1,0 @@
-2025-08-28 18:42:19,623 - __main__ - ERROR - Failed to connect to Neo4j: Cannot resolve address neo4j:7687
-2025-08-28 18:42:37,822 - __main__ - ERROR - Failed to connect to Neo4j: {code: Neo.ClientError.Security.Unauthorized} {message: The client is unauthorized due to authentication failure.}
-2025-08-28 18:43:17,566 - __main__ - ERROR - Failed to connect to Neo4j: {code: Neo.ClientError.Security.Unauthorized} {message: The client is unauthorized due to authentication failure.}
-2025-08-28 18:43:17,566 - __main__ - WARNING - Starting in offline mode - database operations will fail
-2025-08-28 18:44:16,956 - __main__ - ERROR - Failed to connect to Neo4j: {code: Neo.ClientError.Security.Unauthorized} {message: The client is unauthorized due to authentication failure.}
-2025-08-28 18:44:16,956 - __main__ - WARNING - Starting in offline mode - database operations will fail
-2025-08-28 18:44:16,993 - __main__ - INFO - Database connection closed
