@@ -1,6 +1,6 @@
 # api/repositories/person_repository.py
 from typing import Dict, List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import hashlib
 
 from database import BaseRepository
@@ -150,7 +150,19 @@ class PersonRepository(BaseRepository):
         ORDER BY r.start_date DESC
         """
         result = self.execute_query(query, {"person_id": person_id})
-        return result
+        
+        # Flatten the response by merging company data with relationship data
+        flattened = []
+        for record in result:
+            company_data = record.get('c', {})
+            # Merge company properties with relationship properties
+            flattened_record = {**company_data}
+            flattened_record['role'] = record.get('role')
+            flattened_record['start_date'] = record.get('start_date')
+            flattened_record['end_date'] = record.get('end_date')
+            flattened.append(flattened_record)
+        
+        return flattened
     
     def add_to_company(self, person_id: str, dot_number: int, role: str, 
                        start_date: Optional[date] = None, end_date: Optional[date] = None) -> bool:
@@ -173,7 +185,7 @@ class PersonRepository(BaseRepository):
             "role": role,
             "start_date": start_date.isoformat() if start_date else date.today().isoformat(),
             "end_date": end_date.isoformat() if end_date else None,
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         result = self.execute_query(query, params)
@@ -243,4 +255,14 @@ class PersonRepository(BaseRepository):
                max(company_count) as max_companies_per_person
         """
         result = self.execute_query(query)
-        return result[0] if result else {}
+        
+        # Return defaults if empty result
+        if not result:
+            return {
+                "total_persons": 0,
+                "persons_with_companies": 0,
+                "persons_with_multiple_companies": 0,
+                "max_companies_per_person": 0
+            }
+        
+        return result[0]

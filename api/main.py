@@ -100,7 +100,16 @@ app.include_router(
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
-    return {"error": "Resource not found", "path": str(request.url)}
+    # If it's an HTTPException with a detail, preserve it
+    if hasattr(exc, 'detail'):
+        return JSONResponse(
+            status_code=404,
+            content={"detail": exc.detail}
+        )
+    return JSONResponse(
+        status_code=404,
+        content={"error": "Resource not found", "path": str(request.url)}
+    )
 
 @app.exception_handler(500)
 async def internal_error_handler(request, exc):

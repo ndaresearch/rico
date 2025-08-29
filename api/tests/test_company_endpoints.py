@@ -1,18 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 from datetime import date
-import os
-import sys
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Set test environment variables
-os.environ["NEO4J_URI"] = "bolt://localhost:7687"
-os.environ["NEO4J_USER"] = "neo4j"
-os.environ["NEO4J_PASSWORD"] = "testpassword123"
-os.environ["API_KEY"] = "test-api-key"
-
+# conftest.py will handle environment setup
 from main import app
 from repositories.company_repository import CompanyRepository
 
