@@ -1,0 +1,42 @@
+2025-08-28 23:34:40.193+0000 INFO  Logging config in use: Embedded default config 'default-user-logs.xml'
+2025-08-28 23:34:40.196+0000 INFO  Starting...
+2025-08-28 23:34:40.590+0000 INFO  This instance is ServerId{d26fd693} (d26fd693-51a0-4147-a18d-25c55d977119)
+2025-08-28 23:34:40.903+0000 INFO  ======== Neo4j 5.15.0 ========
+2025-08-28 23:34:42.988+0000 INFO  Bolt enabled on 0.0.0.0:7687.
+2025-08-28 23:34:43.287+0000 INFO  HTTP enabled on 0.0.0.0:7474.
+2025-08-28 23:34:43.287+0000 INFO  Remote interface available at http://localhost:7474/
+2025-08-28 23:34:43.289+0000 INFO  id: 8EB40C594F34B2E07FBDDC50B3E2085C5B13E23D15D0F2D159D11378BA2D8A33
+2025-08-28 23:34:43.289+0000 INFO  name: system
+2025-08-28 23:34:43.289+0000 INFO  creationDate: 2025-08-28T23:34:41.273Z
+2025-08-28 23:34:43.289+0000 INFO  Started.
+2025-08-28 23:47:59.629+0000 INFO  Neo4j Server shutdown initiated by request
+2025-08-28 23:47:59.631+0000 INFO  Stopping...
+2025-08-28 23:48:04.922+0000 INFO  Stopped.
+2025-08-28 23:48:41.217+0000 INFO  Logging config in use: Embedded default config 'default-user-logs.xml'
+2025-08-28 23:48:41.220+0000 INFO  Starting...
+2025-08-28 23:48:41.603+0000 INFO  This instance is ServerId{42b1d3cb} (42b1d3cb-2621-45af-a499-9ba2371f24c5)
+2025-08-28 23:48:41.907+0000 INFO  ======== Neo4j 5.15.0 ========
+2025-08-28 23:48:43.958+0000 INFO  Bolt enabled on 0.0.0.0:7687.
+2025-08-28 23:48:44.283+0000 INFO  HTTP enabled on 0.0.0.0:7474.
+2025-08-28 23:48:44.283+0000 INFO  Remote interface available at http://localhost:7474/
+2025-08-28 23:48:44.285+0000 INFO  id: 213C9933227C06C6442200A2E5F4BC2C485D0895D314FD761E92300739AAFBC0
+2025-08-28 23:48:44.285+0000 INFO  name: system
+2025-08-28 23:48:44.286+0000 INFO  creationDate: 2025-08-28T23:48:42.293Z
+2025-08-28 23:48:44.286+0000 INFO  Started.
+2025-08-29 01:42:37.823+0000 WARN  [bolt-55] The client is unauthorized due to authentication failure.
+2025-08-29 01:43:17.565+0000 WARN  [bolt-58] The client is unauthorized due to authentication failure.
+2025-08-29 01:44:16.955+0000 WARN  [bolt-60] The client is unauthorized due to authentication failure.
+2025-08-29 01:45:03.267+0000 INFO  Neo4j Server shutdown initiated by request
+2025-08-29 01:45:03.267+0000 INFO  Stopping...
+2025-08-29 01:45:08.396+0000 INFO  Stopped.
+2025-08-29 01:45:17.764+0000 INFO  Logging config in use: Embedded default config 'default-user-logs.xml'
+2025-08-29 01:45:17.768+0000 INFO  Starting...
+2025-08-29 01:45:18.333+0000 INFO  This instance is ServerId{42b1d3cb} (42b1d3cb-2621-45af-a499-9ba2371f24c5)
+2025-08-29 01:45:18.712+0000 INFO  ======== Neo4j 5.15.0 ========
+2025-08-29 01:45:21.051+0000 INFO  Bolt enabled on 0.0.0.0:7687.
+2025-08-29 01:45:21.405+0000 INFO  HTTP enabled on 0.0.0.0:7474.
+2025-08-29 01:45:21.406+0000 INFO  Remote interface available at http://localhost:7474/
+2025-08-29 01:45:21.408+0000 INFO  id: 213C9933227C06C6442200A2E5F4BC2C485D0895D314FD761E92300739AAFBC0
+2025-08-29 01:45:21.408+0000 INFO  name: system
+2025-08-29 01:45:21.408+0000 INFO  creationDate: 2025-08-28T23:48:42.293Z
+2025-08-29 01:45:21.409+0000 INFO  Started.
