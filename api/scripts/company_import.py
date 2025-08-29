@@ -4,6 +4,9 @@ import requests
 import sys
 from typing import List, Dict
 import time
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
 
 def load_csv(filename: str) -> List[Dict]:
@@ -20,7 +23,10 @@ def load_csv(filename: str) -> List[Dict]:
                         row[key] = json.loads(value)
                     except:
                         pass
-                # Handle None/empty values
+                # Special handling for list fields that should default to empty list
+                elif key in ['dba_name', 'cargo_carried'] and (value == '' or value == 'None'):
+                    row[key] = []
+                # Handle None/empty values for other fields
                 elif value == '' or value == 'None':
                     row[key] = None
                 # Convert numeric fields
@@ -137,18 +143,38 @@ def verify_import(api_url: str, api_key: str):
 
 def main():
     """Main import function"""
-    # Configuration
-    API_URL = "http://localhost:8000"
-    API_KEY = "test-api-key-123"  # Get from .env file
+    # Load environment variables from .env file
+    # Try to find .env file in different locations
+    env_paths = [
+        Path(__file__).parent.parent / '.env',  # api/.env
+        Path(__file__).parent.parent.parent / '.env',  # rico-graph/.env
+        Path('.env')  # current directory
+    ]
+    
+    for env_path in env_paths:
+        if env_path.exists():
+            load_dotenv(env_path)
+            print(f"Loaded environment from: {env_path}")
+            break
+    
+    # Configuration with defaults from environment
+    API_URL = os.getenv("API_URL", "http://localhost:8000")
+    API_KEY = os.getenv("API_KEY", "")
     CSV_FILE = "companies.csv"
     
-    # Allow command line arguments
+    # Allow command line arguments to override
     if len(sys.argv) > 1:
         CSV_FILE = sys.argv[1]
     if len(sys.argv) > 2:
         API_URL = sys.argv[2]
     if len(sys.argv) > 3:
         API_KEY = sys.argv[3]
+    
+    # Check if API key is set
+    if not API_KEY:
+        print("ERROR: API_KEY not found in environment or command line arguments")
+        print("Please set API_KEY in your .env file or pass it as the 4th argument")
+        sys.exit(1)
     
     print("RICO Company Data Import")
     print("=" * 50)
