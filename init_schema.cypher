@@ -1,120 +1,90 @@
-// init_schema.cypher
-// Run this file after Neo4j is up to create constraints and indexes
+// Drop existing constraints and indexes (for clean setup)
+CALL apoc.schema.assert({}, {});
 
-// ========================================
-// CONSTRAINTS (Run these first)
-// ========================================
-
-// Unique constraints
-CREATE CONSTRAINT company_dot_unique IF NOT EXISTS 
+// Create constraints for Company
+CREATE CONSTRAINT company_dot_unique IF NOT EXISTS
 FOR (c:Company) REQUIRE c.dot_number IS UNIQUE;
 
-CREATE CONSTRAINT equipment_vin_unique IF NOT EXISTS 
-FOR (e:Equipment) REQUIRE e.vin IS UNIQUE;
+CREATE INDEX company_mc_index IF NOT EXISTS
+FOR (c:Company) ON (c.mc_number);
 
-CREATE CONSTRAINT driver_cdl_unique IF NOT EXISTS 
-FOR (d:Driver) REQUIRE d.cdl_number IS UNIQUE;
-
-CREATE CONSTRAINT person_id_unique IF NOT EXISTS 
-FOR (p:Person) REQUIRE p.person_id IS UNIQUE;
-
-CREATE CONSTRAINT authority_id_unique IF NOT EXISTS 
-FOR (a:Authority) REQUIRE a.authority_id IS UNIQUE;
-
-CREATE CONSTRAINT location_id_unique IF NOT EXISTS 
-FOR (l:Location) REQUIRE l.location_id IS UNIQUE;
-
-CREATE CONSTRAINT crash_report_unique IF NOT EXISTS 
-FOR (c:Crash) REQUIRE c.report_number IS UNIQUE;
-
-CREATE CONSTRAINT violation_id_unique IF NOT EXISTS 
-FOR (v:Violation) REQUIRE v.violation_id IS UNIQUE;
-
-CREATE CONSTRAINT lease_program_id_unique IF NOT EXISTS 
-FOR (lp:LeasePurchaseProgram) REQUIRE lp.program_id IS UNIQUE;
-
-// ========================================
-// INDEXES (Run after constraints)
-// ========================================
-
-// Node property indexes
-CREATE INDEX company_name_index IF NOT EXISTS 
-FOR (c:Company) ON (c.legal_name);
-
-CREATE INDEX company_created_index IF NOT EXISTS 
-FOR (c:Company) ON (c.created_date);
-
-CREATE INDEX company_status_index IF NOT EXISTS 
+CREATE INDEX company_status_index IF NOT EXISTS
 FOR (c:Company) ON (c.authority_status);
 
-CREATE INDEX company_safety_rating_index IF NOT EXISTS 
-FOR (c:Company) ON (c.safety_rating);
+CREATE INDEX company_ein_index IF NOT EXISTS
+FOR (c:Company) ON (c.ein);
 
-CREATE INDEX person_name_index IF NOT EXISTS 
+CREATE INDEX company_risk_index IF NOT EXISTS
+FOR (c:Company) ON (c.chameleon_risk_score);
+
+// Create constraints for Person
+CREATE CONSTRAINT person_id_unique IF NOT EXISTS
+FOR (p:Person) REQUIRE p.person_id IS UNIQUE;
+
+CREATE INDEX person_name_index IF NOT EXISTS
 FOR (p:Person) ON (p.full_name);
 
-CREATE INDEX location_address_index IF NOT EXISTS 
-FOR (l:Location) ON (l.street_address);
+// Create constraints for Driver
+CREATE CONSTRAINT driver_cdl_unique IF NOT EXISTS
+FOR (d:Driver) REQUIRE d.cdl_number IS UNIQUE;
 
-CREATE INDEX location_city_state_index IF NOT EXISTS 
-FOR (l:Location) ON (l.city, l.state);
+CREATE INDEX driver_status_index IF NOT EXISTS
+FOR (d:Driver) ON (d.status);
 
-CREATE INDEX authority_dates_index IF NOT EXISTS 
-FOR (a:Authority) ON (a.granted_date, a.revoked_date);
+// Create constraints for Equipment
+CREATE CONSTRAINT equipment_vin_unique IF NOT EXISTS
+FOR (e:Equipment) REQUIRE e.vin IS UNIQUE;
 
-CREATE INDEX authority_status_index IF NOT EXISTS 
-FOR (a:Authority) ON (a.status);
-
-CREATE INDEX equipment_type_index IF NOT EXISTS 
-FOR (e:Equipment) ON (e.type);
-
-CREATE INDEX equipment_status_index IF NOT EXISTS 
+CREATE INDEX equipment_status_index IF NOT EXISTS
 FOR (e:Equipment) ON (e.status);
 
-CREATE INDEX crash_date_index IF NOT EXISTS 
-FOR (c:Crash) ON (c.crash_date);
+CREATE INDEX equipment_type_index IF NOT EXISTS
+FOR (e:Equipment) ON (e.type);
 
-CREATE INDEX crash_severity_index IF NOT EXISTS 
-FOR (c:Crash) ON (c.severity);
+// Create constraints for Location
+CREATE CONSTRAINT location_id_unique IF NOT EXISTS
+FOR (l:Location) REQUIRE l.location_id IS UNIQUE;
 
-CREATE INDEX violation_date_index IF NOT EXISTS 
+CREATE INDEX location_address_index IF NOT EXISTS
+FOR (l:Location) ON (l.street_address);
+
+CREATE INDEX location_city_state_index IF NOT EXISTS
+FOR (l:Location) ON (l.city, l.state);
+
+// Create constraints for Authority
+CREATE CONSTRAINT authority_id_unique IF NOT EXISTS
+FOR (a:Authority) REQUIRE a.authority_id IS UNIQUE;
+
+CREATE INDEX authority_mc_index IF NOT EXISTS
+FOR (a:Authority) ON (a.mc_number);
+
+CREATE INDEX authority_status_index IF NOT EXISTS
+FOR (a:Authority) ON (a.status);
+
+// Create constraints for Crash
+CREATE CONSTRAINT crash_report_unique IF NOT EXISTS
+FOR (cr:Crash) REQUIRE cr.report_number IS UNIQUE;
+
+CREATE INDEX crash_date_index IF NOT EXISTS
+FOR (cr:Crash) ON (cr.crash_date);
+
+// Create constraints for Violation
+CREATE CONSTRAINT violation_id_unique IF NOT EXISTS
+FOR (v:Violation) REQUIRE v.violation_id IS UNIQUE;
+
+CREATE INDEX violation_code_index IF NOT EXISTS
+FOR (v:Violation) ON (v.code);
+
+CREATE INDEX violation_date_index IF NOT EXISTS
 FOR (v:Violation) ON (v.violation_date);
 
-CREATE INDEX violation_category_index IF NOT EXISTS 
-FOR (v:Violation) ON (v.category);
+// Create constraints for LeasePurchaseProgram
+CREATE CONSTRAINT lease_program_id_unique IF NOT EXISTS
+FOR (lp:LeasePurchaseProgram) REQUIRE lp.program_id IS UNIQUE;
 
-// Composite indexes for common query patterns
-CREATE INDEX company_type_status_index IF NOT EXISTS 
-FOR (c:Company) ON (c.entity_type, c.authority_status);
+// Create indexes for relationship properties (when we add them)
+// These will be used for temporal queries
+CALL db.index.fulltext.createNodeIndex("companyNameIndex", ["Company"], ["legal_name", "dba_name"]) IF NOT EXISTS;
 
-// ========================================
-// RELATIONSHIP INDEXES (Neo4j 5.x)
-// ========================================
-
-CREATE INDEX operates_dates IF NOT EXISTS 
-FOR ()-[o:OPERATES]->() ON (o.start_date, o.end_date);
-
-CREATE INDEX employed_dates IF NOT EXISTS 
-FOR ()-[e:EMPLOYED_BY]->() ON (e.start_date, e.end_date);
-
-CREATE INDEX officer_dates IF NOT EXISTS 
-FOR ()-[h:HAS_OFFICER]->() ON (h.start_date, h.end_date);
-
-CREATE INDEX settlement_date IF NOT EXISTS 
-FOR ()-[s:WEEKLY_SETTLEMENT]->() ON (s.date);
-
-CREATE INDEX located_at_current IF NOT EXISTS 
-FOR ()-[l:LOCATED_AT]->() ON (l.is_current);
-
-CREATE INDEX leased_dates IF NOT EXISTS 
-FOR ()-[l:LEASED]->() ON (l.start_date, l.end_date);
-
-// ========================================
-// VERIFY SETUP
-// ========================================
-
-// Show all constraints
-SHOW CONSTRAINTS;
-
-// Show all indexes
-SHOW INDEXES;
+// Return confirmation
+RETURN "Schema initialization complete" as status;

@@ -91,6 +91,9 @@ logs/
 log/
 *.log.*
 
+# Project specific
+backup/
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -118,13 +121,18 @@ api/*.log
 api/.pytest_cache/
 api/htmlcov/
 api/.coverage
+api/csv/models/
+api/csv/test_data/
 
 # Test outputs
 test-results/
 test-reports/
 
 # Neo4j
-neo4j/
+neo4j/data/
+neo4j/logs/
+neo4j/import/
+neo4j/plugins/
 
 # Docker
 .dockerignore
