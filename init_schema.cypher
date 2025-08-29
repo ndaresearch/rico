@@ -1,6 +1,3 @@
-// Drop existing constraints and indexes (for clean setup)
-CALL apoc.schema.assert({}, {});
-
 // Create constraints for Company
 CREATE CONSTRAINT company_dot_unique IF NOT EXISTS
 FOR (c:Company) REQUIRE c.dot_number IS UNIQUE;
@@ -81,10 +78,6 @@ FOR (v:Violation) ON (v.violation_date);
 // Create constraints for LeasePurchaseProgram
 CREATE CONSTRAINT lease_program_id_unique IF NOT EXISTS
 FOR (lp:LeasePurchaseProgram) REQUIRE lp.program_id IS UNIQUE;
-
-// Create indexes for relationship properties (when we add them)
-// These will be used for temporal queries
-CALL db.index.fulltext.createNodeIndex("companyNameIndex", ["Company"], ["legal_name", "dba_name"]) IF NOT EXISTS;
 
 // Return confirmation
 RETURN "Schema initialization complete" as status;

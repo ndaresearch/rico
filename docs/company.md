@@ -338,22 +338,6 @@ AND toLower(c1.legal_name) CONTAINS toLower(substring(c2.legal_name, 0, 10))
 RETURN c1.legal_name, c2.legal_name;
 ```
 
-## Next Steps
-
-With the Company module complete, the next entities to implement are:
-
-1. **Person Module** (Days 8-9)
-   - Officer relationships
-   - Duplicate person detection
-   
-2. **Equipment Module** (Days 12-13)
-   - VIN validation
-   - Transfer tracking
-
-3. **Pattern Detection** (Days 23-25)
-   - Chameleon detection endpoint
-   - Network analysis
-
 ## Troubleshooting
 
 ### Common Issues

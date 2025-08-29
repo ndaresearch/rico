@@ -5,10 +5,12 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends, Security, status
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 from database import db
 from routes.company_routes import router as company_router
+from routes.person_routes import router as person_router
 
 load_dotenv()
 
@@ -90,8 +92,15 @@ app.include_router(
     dependencies=[Depends(verify_api_key)]
 )
 
+app.include_router(
+    person_router,
+    dependencies=[Depends(verify_api_key)]
+)
+
 # Error handlers
-from fastapi.responses import JSONResponse
+@app.exception_handler(404)
+async def not_found_handler(request, exc):
+    return {"error": "Resource not found", "path": str(request.url)}
 
 @app.exception_handler(500)
 async def internal_error_handler(request, exc):
