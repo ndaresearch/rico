@@ -57,7 +57,7 @@ The CSV at `api/csv/real_data/jb_hunt_carriers.csv` contains:
 | 6 | Run tests to verify | ✅ Completed | Session 1 | All 60 tests passing |
 | 7 | Create JB Hunt carriers import script | ✅ Completed | Session 1 | 67 carriers imported |
 | 8 | Import JB Hunt data | ✅ Completed | Session 1 | All relationships created |
-| 9 | Delete old Company implementation | ⏳ Pending | Session 2+ | After verification |
+| 9 | Delete old Company implementation | ✅ Completed | Session 2 | All files removed |
 | 10 | Update database schema | ⏳ Pending | Session 2+ | Constraints/indexes |
 
 ## Files Created (Session 1)
@@ -79,13 +79,16 @@ The CSV at `api/csv/real_data/jb_hunt_carriers.csv` contains:
 - ✅ `api/main.py` - Added new routers
 - ✅ `api/tests/test_carrier_endpoints.py` - Fixed import for contract test
 
-## Files to Delete (After Verification)
-- `api/models/company.py`
-- `api/repositories/company_repository.py`
-- `api/routes/company_routes.py`
-- `api/tests/test_company_endpoints.py`
-- `api/scripts/generate_data/company_generate_test_data.py`
-- `api/scripts/import/company_import.py`
+## Files Deleted (Session 2)
+- ✅ `api/models/company.py`
+- ✅ `api/repositories/company_repository.py`
+- ✅ `api/routes/company_routes.py`
+- ✅ `api/tests/test_company_endpoints.py`
+- ✅ `api/scripts/generate_data/company_generate_test_data.py`
+- ✅ `api/scripts/import/company_import.py`
+- ✅ `api/csv/models/company.csv`
+- ✅ `api/csv/test_data/companies.csv`
+- ✅ `docs/company.md`
 
 ## Testing Instructions
 ```bash
@@ -133,6 +136,18 @@ The CSV at `api/csv/real_data/jb_hunt_carriers.csv` contains:
 - Percentages: "2.50%" → 2.5
 - Null handling: "-" → 0 for crashes, "n/a" → None for insurance
 - CSV had empty first line and spaces in column headers - handled
+
+## Session 2 Accomplishments (Cleanup Phase)
+1. **Redesigned Person relationships** - Separate relationships for TargetCompany executives vs Carrier officers
+2. **Updated Person entity** - Now supports dual relationships with proper differentiation
+3. **Removed all Company code** - 9 files deleted, no legacy code remains
+4. **Fixed main.py** - Removed Company router registration
+5. **Tests passing** - 39/48 tests passing (Person tests need more work)
+
+### New Relationship Model
+- `(:TargetCompany)-[:HAS_EXECUTIVE]->(:Person)` - For corporate executives (CEO, CFO, etc.)
+- `(:Carrier)-[:MANAGED_BY]->(:Person)` - For carrier primary officers
+- Deprecated generic `(:Company)-[:HAS_OFFICER]->(:Person)` relationship
 
 ## Session 1 Accomplishments
 1. **Complete refactoring** of Company model into specialized entities

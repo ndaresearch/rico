@@ -5,11 +5,15 @@ from datetime import date
 # conftest.py will handle environment setup
 from main import app
 from repositories.person_repository import PersonRepository
-from repositories.company_repository import CompanyRepository
+from repositories.target_company_repository import TargetCompanyRepository
+from repositories.carrier_repository import CarrierRepository
+from models.target_company import TargetCompany
+from models.carrier import Carrier
 
 client = TestClient(app)
 person_repo = PersonRepository()
-company_repo = CompanyRepository()
+target_company_repo = TargetCompanyRepository()
+carrier_repo = CarrierRepository()
 
 # Test API key for authenticated requests
 headers = {"X-API-Key": "test-api-key"}
@@ -28,10 +32,11 @@ def cleanup():
         for person in persons:
             person_repo.delete(person['person_id'])
     
-    # Clean test companies (DOT numbers 999000-999999)
+    # Clean test target companies and carriers (DOT numbers 999000-999999)
     test_dot_numbers = [999001, 999002, 999003, 999004, 999005]
     for dot in test_dot_numbers:
-        company_repo.delete(dot)
+        target_company_repo.delete(dot)
+        carrier_repo.delete(dot)  # Also clean carriers with same numbers
     
     yield
     
@@ -42,7 +47,8 @@ def cleanup():
             person_repo.delete(person['person_id'])
     
     for dot in test_dot_numbers:
-        company_repo.delete(dot)
+        target_company_repo.delete(dot)
+        carrier_repo.delete(dot)
 
 
 def test_create_person():
@@ -230,52 +236,52 @@ def test_search_persons_case_insensitive():
     assert any("Test Person 1" in p["full_name"] for p in data)
 
 
-def test_get_person_companies():
-    """Test getting companies associated with a person"""
-    # Create a company
-    company_data = {
-        "dot_number": 999001,
-        "legal_name": "Test Trucking Inc",
-        "entity_type": "CARRIER"
-    }
-    client.post("/companies/", json=company_data, headers=headers)
+def test_get_person_target_companies():
+    """Test getting TargetCompanies where person is an executive"""
+    # Create a TargetCompany
+    target_company = TargetCompany(
+        dot_number=999001,
+        legal_name="Test Trucking Inc",
+        entity_type="CARRIER"
+    )
+    target_company_repo.create(target_company)
     
-    # Create a person and assign as officer
-    officer_data = {
+    # Create a person and assign as executive
+    executive_data = {
         "dot_number": 999001,
-        "full_name": "Test Officer 1",
+        "full_name": "Test Executive 1",
         "first_name": "Test",
-        "last_name": "Officer",
+        "last_name": "Executive",
         "role": "CEO",
         "start_date": "2023-01-01"
     }
-    officer_response = client.post("/persons/company-officer", json=officer_data, headers=headers)
-    person_id = officer_response.json()["person"]["person_id"]
+    executive_response = client.post("/persons/target-company-executive", json=executive_data, headers=headers)
+    person_id = executive_response.json()["person"]["person_id"]
     
-    # Get person's companies
-    response = client.get(f"/persons/{person_id}/companies", headers=headers)
+    # Get person's target companies
+    response = client.get(f"/persons/{person_id}/target-companies", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
     assert any(c["dot_number"] == 999001 for c in data)
 
 
-def test_get_nonexistent_person_companies():
-    """Test getting companies for non-existent person returns 404"""
-    response = client.get("/persons/NONEXISTENT123/companies", headers=headers)
+def test_get_nonexistent_person_target_companies():
+    """Test getting target companies for non-existent person returns 404"""
+    response = client.get("/persons/NONEXISTENT123/target-companies", headers=headers)
     assert response.status_code == 404
     assert "not found" in response.json()["detail"]
 
 
-def test_create_company_officer():
-    """Test creating a person and assigning as company officer"""
-    # Create a company first
-    company_data = {
-        "dot_number": 999002,
-        "legal_name": "Test Transport LLC",
-        "entity_type": "CARRIER"
-    }
-    client.post("/companies/", json=company_data, headers=headers)
+def test_create_target_company_executive():
+    """Test creating a person and assigning as TargetCompany executive"""
+    # Create a TargetCompany first
+    target_company = TargetCompany(
+        dot_number=999002,
+        legal_name="Test Transport LLC",
+        entity_type="CARRIER"
+    )
+    target_company_repo.create(target_company)
     
     # Create person and assign as officer
     officer_data = {
@@ -290,7 +296,7 @@ def test_create_company_officer():
         "phone": ["+1234567890"]
     }
     
-    response = client.post("/persons/company-officer", json=officer_data, headers=headers)
+    response = client.post("/persons/target-company-executive", json=officer_data, headers=headers)
     assert response.status_code == 201
     data = response.json()
     assert data["person"]["full_name"] == "Test Officer 2"
@@ -299,28 +305,28 @@ def test_create_company_officer():
     assert data["relationship"]["role"] == "President"
 
 
-def test_create_company_officer_nonexistent_company():
-    """Test creating officer for non-existent company returns 404"""
+def test_create_executive_nonexistent_target_company():
+    """Test creating executive for non-existent TargetCompany returns 404"""
     officer_data = {
         "dot_number": 999999,
         "full_name": "Test Officer 3",
         "role": "CEO"
     }
     
-    response = client.post("/persons/company-officer", json=officer_data, headers=headers)
+    response = client.post("/persons/target-company-executive", json=officer_data, headers=headers)
     assert response.status_code == 404
     assert "not found" in response.json()["detail"]
 
 
-def test_assign_existing_officer():
-    """Test assigning an existing person as company officer"""
-    # Create a company
-    company_data = {
-        "dot_number": 999003,
-        "legal_name": "Test Logistics Co",
-        "entity_type": "BROKER"
-    }
-    client.post("/companies/", json=company_data, headers=headers)
+def test_assign_existing_executive():
+    """Test assigning an existing person as TargetCompany executive"""
+    # Create a TargetCompany
+    target_company = TargetCompany(
+        dot_number=999003,
+        legal_name="Test Logistics Co",
+        entity_type="BROKER"
+    )
+    target_company_repo.create(target_company)
     
     # Create a person
     person_data = {
@@ -339,7 +345,7 @@ def test_assign_existing_officer():
         "start_date": "2023-06-01"
     }
     
-    response = client.post(f"/persons/assign-officer?dot_number=999003", 
+    response = client.post(f"/persons/assign-executive?dot_number=999003", 
                           json=assignment_data, headers=headers)
     assert response.status_code == 200
     data = response.json()
@@ -350,27 +356,27 @@ def test_assign_existing_officer():
 
 def test_assign_nonexistent_person():
     """Test assigning non-existent person returns 404"""
-    # Create a company
-    company_data = {
-        "dot_number": 999004,
-        "legal_name": "Test Freight Inc",
-        "entity_type": "CARRIER"
-    }
-    client.post("/companies/", json=company_data, headers=headers)
+    # Create a TargetCompany
+    target_company = TargetCompany(
+        dot_number=999004,
+        legal_name="Test Freight Inc",
+        entity_type="CARRIER"
+    )
+    target_company_repo.create(target_company)
     
     assignment_data = {
         "person_id": "NONEXISTENT123",
         "role": "CEO"
     }
     
-    response = client.post(f"/persons/assign-officer?dot_number=999004", 
+    response = client.post(f"/persons/assign-executive?dot_number=999004", 
                           json=assignment_data, headers=headers)
     assert response.status_code == 404
     assert "Person with ID" in response.json()["detail"]
 
 
-def test_assign_to_nonexistent_company():
-    """Test assigning to non-existent company returns 404"""
+def test_assign_to_nonexistent_target_company():
+    """Test assigning to non-existent TargetCompany returns 404"""
     # Create a person
     person_data = {
         "person_id": "",
@@ -384,90 +390,90 @@ def test_assign_to_nonexistent_company():
         "role": "CEO"
     }
     
-    response = client.post(f"/persons/assign-officer?dot_number=999999", 
+    response = client.post(f"/persons/assign-executive?dot_number=999999", 
                           json=assignment_data, headers=headers)
     assert response.status_code == 404
-    assert "Company with DOT" in response.json()["detail"]
+    assert "TargetCompany with DOT" in response.json()["detail"]
 
 
-def test_remove_officer():
-    """Test removing officer relationship"""
-    # Create a company
-    company_data = {
-        "dot_number": 999005,
-        "legal_name": "Test Express LLC",
-        "entity_type": "CARRIER"
-    }
-    client.post("/companies/", json=company_data, headers=headers)
+def test_remove_executive():
+    """Test removing executive relationship"""
+    # Create a TargetCompany
+    target_company = TargetCompany(
+        dot_number=999005,
+        legal_name="Test Express LLC",
+        entity_type="CARRIER"
+    )
+    target_company_repo.create(target_company)
     
-    # Create and assign officer
-    officer_data = {
+    # Create and assign executive
+    executive_data = {
         "dot_number": 999005,
-        "full_name": "Test Officer 1",
+        "full_name": "Test Executive 1",
         "role": "CEO"
     }
-    officer_response = client.post("/persons/company-officer", json=officer_data, headers=headers)
-    person_id = officer_response.json()["person"]["person_id"]
+    executive_response = client.post("/persons/target-company-executive", json=executive_data, headers=headers)
+    person_id = executive_response.json()["person"]["person_id"]
     
-    # Remove officer relationship
-    response = client.delete(f"/persons/remove-officer?person_id={person_id}&dot_number=999005", 
+    # Remove executive relationship
+    response = client.delete(f"/persons/remove-executive?person_id={person_id}&dot_number=999005", 
                             headers=headers)
     assert response.status_code == 204
     
-    # Verify relationship is removed by checking person's companies
-    response = client.get(f"/persons/{person_id}/companies", headers=headers)
+    # Verify relationship is removed by checking person's target companies
+    response = client.get(f"/persons/{person_id}/target-companies", headers=headers)
     data = response.json()
     assert not any(c["dot_number"] == 999005 for c in data)
 
 
 def test_remove_nonexistent_relationship():
     """Test removing non-existent relationship returns 404"""
-    response = client.delete("/persons/remove-officer?person_id=NONEXISTENT&dot_number=999999", 
+    response = client.delete("/persons/remove-executive?person_id=NONEXISTENT&dot_number=999999", 
                             headers=headers)
     assert response.status_code == 404
     assert "not found" in response.json()["detail"]
 
 
-def test_find_shared_officers():
-    """Test finding companies with shared officers"""
-    # Create two companies
-    companies = [
-        {"dot_number": 999001, "legal_name": "Company A", "entity_type": "CARRIER"},
-        {"dot_number": 999002, "legal_name": "Company B", "entity_type": "BROKER"}
+def test_find_shared_executives():
+    """Test finding TargetCompanies with shared executives"""
+    # Create two TargetCompanies
+    target_companies = [
+        TargetCompany(dot_number=999001, legal_name="Target Company A", entity_type="CARRIER"),
+        TargetCompany(dot_number=999002, legal_name="Target Company B", entity_type="BROKER")
     ]
-    for company in companies:
-        client.post("/companies/", json=company, headers=headers)
+    for tc in target_companies:
+        target_company_repo.create(tc)
     
-    # Create a shared officer
-    officer_data = {
+    # Create a shared executive
+    executive_data = {
         "dot_number": 999001,
-        "full_name": "Test Officer 1",
+        "full_name": "Test Executive 1",
         "role": "CEO"
     }
-    officer_response = client.post("/persons/company-officer", json=officer_data, headers=headers)
-    person_id = officer_response.json()["person"]["person_id"]
+    executive_response = client.post("/persons/target-company-executive", json=executive_data, headers=headers)
+    person_id = executive_response.json()["person"]["person_id"]
     
-    # Assign same person to second company
+    # Assign same person to second TargetCompany
     assignment_data = {
         "person_id": person_id,
         "role": "President"
     }
-    client.post(f"/persons/assign-officer?dot_number=999002", 
+    client.post(f"/persons/assign-executive?dot_number=999002", 
                json=assignment_data, headers=headers)
     
-    # Find shared officers
-    response = client.get(f"/persons/patterns/shared-officers?dot_number=999001", headers=headers)
+    # Find shared executives
+    response = client.get(f"/persons/patterns/shared-executives?dot_number=999001", headers=headers)
     assert response.status_code == 200
     data = response.json()
-    # Should find Company B as sharing officers with Company A
+    # Should find Target Company B as sharing executives with Target Company A
     assert any(item.get("company", {}).get("dot_number") == 999002 for item in data)
 
 
-def test_find_shared_officers_nonexistent_company():
-    """Test finding shared officers for non-existent company returns 404"""
-    response = client.get("/persons/patterns/shared-officers?dot_number=999999", headers=headers)
+def test_find_shared_executives_nonexistent_target_company():
+    """Test finding shared executives for non-existent TargetCompany returns 404"""
+    response = client.get("/persons/patterns/shared-executives?dot_number=999999", headers=headers)
     assert response.status_code == 404
-    assert "not found" in response.json()["detail"]
+    assert "not found" in response.json()["detail"].lower()
 
 
 def test_find_succession_patterns():

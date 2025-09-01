@@ -9,7 +9,6 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 from database import db
-from routes.company_routes import router as company_router
 from routes.person_routes import router as person_router
 from routes.target_company_routes import router as target_company_router
 from routes.carrier_routes import router as carrier_router
@@ -90,12 +89,6 @@ async def root():
     }
 
 # Include routers with authentication
-# Old Company router (keeping temporarily for backwards compatibility)
-app.include_router(
-    company_router,
-    dependencies=[Depends(verify_api_key)]
-)
-
 app.include_router(
     person_router,
     dependencies=[Depends(verify_api_key)]

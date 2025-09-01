@@ -143,10 +143,15 @@ class PersonRepository(BaseRepository):
         return result[0]['deleted'] > 0 if result else False
     
     def get_companies(self, person_id: str) -> List[Dict]:
-        """Get all companies associated with a person"""
+        """DEPRECATED: Use get_target_companies() or get_carriers() instead"""
+        # For backwards compatibility, return empty list
+        return []
+    
+    def get_target_companies(self, person_id: str) -> List[Dict]:
+        """Get all TargetCompanies where person is an executive"""
         query = """
-        MATCH (p:Person {person_id: $person_id})<-[r:HAS_OFFICER]-(c:Company)
-        RETURN c, r.role as role, r.start_date as start_date, r.end_date as end_date
+        MATCH (p:Person {person_id: $person_id})<-[r:HAS_EXECUTIVE]-(tc:TargetCompany)
+        RETURN tc, r.role as role, r.start_date as start_date, r.end_date as end_date
         ORDER BY r.start_date DESC
         """
         result = self.execute_query(query, {"person_id": person_id})
@@ -154,7 +159,7 @@ class PersonRepository(BaseRepository):
         # Flatten the response by merging company data with relationship data
         flattened = []
         for record in result:
-            company_data = record.get('c', {})
+            company_data = record.get('tc', {})
             # Merge company properties with relationship properties
             flattened_record = {**company_data}
             flattened_record['role'] = record.get('role')
@@ -164,13 +169,38 @@ class PersonRepository(BaseRepository):
         
         return flattened
     
+    def get_carriers(self, person_id: str) -> List[Dict]:
+        """Get all Carriers managed by this person"""
+        query = """
+        MATCH (p:Person {person_id: $person_id})<-[r:MANAGED_BY]-(c:Carrier)
+        RETURN c, r.created_at as since
+        ORDER BY c.carrier_name
+        """
+        result = self.execute_query(query, {"person_id": person_id})
+        
+        # Flatten the response
+        flattened = []
+        for record in result:
+            carrier_data = record.get('c', {})
+            flattened_record = {**carrier_data}
+            flattened_record['managing_since'] = record.get('since')
+            flattened.append(flattened_record)
+        
+        return flattened
+    
     def add_to_company(self, person_id: str, dot_number: int, role: str, 
                        start_date: Optional[date] = None, end_date: Optional[date] = None) -> bool:
-        """Create HAS_OFFICER relationship between Company and Person"""
+        """DEPRECATED: Use add_to_target_company() instead"""
+        # Redirect to new method for backwards compatibility
+        return self.add_to_target_company(person_id, dot_number, role, start_date, end_date)
+    
+    def add_to_target_company(self, person_id: str, dot_number: int, role: str,
+                              start_date: Optional[date] = None, end_date: Optional[date] = None) -> bool:
+        """Create HAS_EXECUTIVE relationship between TargetCompany and Person"""
         query = """
-        MATCH (c:Company {dot_number: $dot_number})
+        MATCH (tc:TargetCompany {dot_number: $dot_number})
         MATCH (p:Person {person_id: $person_id})
-        CREATE (c)-[r:HAS_OFFICER {
+        CREATE (tc)-[r:HAS_EXECUTIVE {
             role: $role,
             start_date: $start_date,
             end_date: $end_date,
@@ -192,9 +222,13 @@ class PersonRepository(BaseRepository):
         return len(result) > 0
     
     def remove_from_company(self, person_id: str, dot_number: int) -> bool:
-        """Remove HAS_OFFICER relationship"""
+        """DEPRECATED: Use remove_from_target_company() instead"""
+        return self.remove_from_target_company(person_id, dot_number)
+    
+    def remove_from_target_company(self, person_id: str, dot_number: int) -> bool:
+        """Remove HAS_EXECUTIVE relationship"""
         query = """
-        MATCH (c:Company {dot_number: $dot_number})-[r:HAS_OFFICER]->(p:Person {person_id: $person_id})
+        MATCH (tc:TargetCompany {dot_number: $dot_number})-[r:HAS_EXECUTIVE]->(p:Person {person_id: $person_id})
         DELETE r
         RETURN count(r) as deleted
         """
@@ -204,35 +238,48 @@ class PersonRepository(BaseRepository):
         })
         return result[0]['deleted'] > 0 if result else False
     
-    def find_shared_officers(self, dot_number: int) -> List[Dict]:
-        """Find companies that share officers with the given company"""
+    def remove_from_carrier(self, person_id: str, usdot: int) -> bool:
+        """Remove MANAGED_BY relationship"""
         query = """
-        MATCH (c1:Company {dot_number: $dot_number})-[:HAS_OFFICER]->(p:Person)
-        MATCH (c2:Company)-[:HAS_OFFICER]->(p)
-        WHERE c1 <> c2
-        RETURN DISTINCT c2 as company, 
-               collect(DISTINCT p.full_name) as shared_officers,
-               count(DISTINCT p) as officer_count
-        ORDER BY officer_count DESC
+        MATCH (c:Carrier {usdot: $usdot})-[r:MANAGED_BY]->(p:Person {person_id: $person_id})
+        DELETE r
+        RETURN count(r) as deleted
+        """
+        result = self.execute_query(query, {
+            "person_id": person_id,
+            "usdot": usdot
+        })
+        return result[0]['deleted'] > 0 if result else False
+    
+    def find_shared_officers(self, dot_number: int) -> List[Dict]:
+        """Find TargetCompanies that share executives with the given TargetCompany"""
+        query = """
+        MATCH (tc1:TargetCompany {dot_number: $dot_number})-[:HAS_EXECUTIVE]->(p:Person)
+        MATCH (tc2:TargetCompany)-[:HAS_EXECUTIVE]->(p)
+        WHERE tc1 <> tc2
+        RETURN DISTINCT tc2 as company, 
+               collect(DISTINCT p.full_name) as shared_executives,
+               count(DISTINCT p) as executive_count
+        ORDER BY executive_count DESC
         """
         result = self.execute_query(query, {"dot_number": dot_number})
         return result
     
     def find_officer_succession_patterns(self) -> List[Dict]:
-        """Find suspicious officer succession patterns (same person, sequential companies)"""
+        """Find suspicious executive succession patterns (same person, sequential companies)"""
         query = """
-        MATCH (p:Person)<-[r1:HAS_OFFICER]-(c1:Company)
-        MATCH (p)<-[r2:HAS_OFFICER]-(c2:Company)
-        WHERE c1 <> c2
+        MATCH (p:Person)<-[r1:HAS_EXECUTIVE]-(tc1:TargetCompany)
+        MATCH (p)<-[r2:HAS_EXECUTIVE]-(tc2:TargetCompany)
+        WHERE tc1 <> tc2
         AND r1.end_date IS NOT NULL
         AND r2.start_date IS NOT NULL
         AND duration.between(date(r1.end_date), date(r2.start_date)).months <= 6
         RETURN p.full_name as person,
-               c1.legal_name as company1,
-               c1.dot_number as dot1,
+               tc1.legal_name as company1,
+               tc1.dot_number as dot1,
                r1.end_date as left_date,
-               c2.legal_name as company2,
-               c2.dot_number as dot2,
+               tc2.legal_name as company2,
+               tc2.dot_number as dot2,
                r2.start_date as joined_date
         ORDER BY p.full_name, r1.end_date
         """
@@ -244,15 +291,22 @@ class PersonRepository(BaseRepository):
         query = """
         MATCH (p:Person)
         WITH count(p) as total_persons
-        MATCH (p:Person)<-[:HAS_OFFICER]-(c:Company)
-        WITH total_persons, count(DISTINCT p) as persons_with_companies
-        MATCH (p:Person)<-[:HAS_OFFICER]-(c:Company)
-        WITH total_persons, persons_with_companies, p, count(DISTINCT c) as company_count
-        WHERE company_count > 1
+        OPTIONAL MATCH (p:Person)<-[:HAS_EXECUTIVE]-(tc:TargetCompany)
+        WITH total_persons, count(DISTINCT p) as executives
+        OPTIONAL MATCH (p:Person)<-[:MANAGED_BY]-(c:Carrier)
+        WITH total_persons, executives, count(DISTINCT p) as officers
+        OPTIONAL MATCH (p:Person)<-[:HAS_EXECUTIVE]-(tc:TargetCompany)
+        WITH total_persons, executives, officers, p, count(DISTINCT tc) as target_count
+        WHERE target_count > 1
+        WITH total_persons, executives, officers, count(DISTINCT p) as multi_target_persons
+        OPTIONAL MATCH (p:Person)<-[:MANAGED_BY]-(c:Carrier)
+        WITH total_persons, executives, officers, multi_target_persons, p, count(DISTINCT c) as carrier_count
+        WHERE carrier_count > 1
         RETURN total_persons,
-               persons_with_companies,
-               count(DISTINCT p) as persons_with_multiple_companies,
-               max(company_count) as max_companies_per_person
+               executives as persons_as_executives,
+               officers as persons_as_officers,
+               multi_target_persons as persons_with_multiple_target_companies,
+               count(DISTINCT p) as persons_with_multiple_carriers
         """
         result = self.execute_query(query)
         
@@ -260,9 +314,10 @@ class PersonRepository(BaseRepository):
         if not result:
             return {
                 "total_persons": 0,
-                "persons_with_companies": 0,
-                "persons_with_multiple_companies": 0,
-                "max_companies_per_person": 0
+                "persons_as_executives": 0,
+                "persons_as_officers": 0,
+                "persons_with_multiple_target_companies": 0,
+                "persons_with_multiple_carriers": 0
             }
         
         return result[0]
