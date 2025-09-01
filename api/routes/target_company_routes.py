@@ -6,7 +6,11 @@ from models.target_company import TargetCompany
 from repositories.target_company_repository import TargetCompanyRepository
 
 
-router = APIRouter(prefix="/target-companies", tags=["target-companies"])
+router = APIRouter(
+    prefix="/target-companies", 
+    tags=["target-companies"],
+    responses={404: {"description": "Target company not found"}}
+)
 repo = TargetCompanyRepository()
 
 

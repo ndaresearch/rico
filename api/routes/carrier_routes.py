@@ -6,7 +6,11 @@ from models.carrier import Carrier
 from repositories.carrier_repository import CarrierRepository
 
 
-router = APIRouter(prefix="/carriers", tags=["carriers"])
+router = APIRouter(
+    prefix="/carriers", 
+    tags=["carriers"],
+    responses={404: {"description": "Carrier not found"}}
+)
 repo = CarrierRepository()
 
 
@@ -36,9 +40,24 @@ class OfficerLinkRequest(BaseModel):
     person_id: Optional[str] = None
 
 
-@router.post("/", response_model=Dict, status_code=status.HTTP_201_CREATED)
+@router.post("/", 
+             response_model=Dict, 
+             status_code=status.HTTP_201_CREATED,
+             summary="Create a new carrier",
+             description="Create a new carrier entity in the graph database")
 async def create_carrier(carrier: Carrier):
-    """Create a new carrier"""
+    """Create a new carrier in the graph database.
+    
+    Args:
+        carrier: Carrier model with required information
+        
+    Returns:
+        dict: Created carrier data with all properties
+        
+    Raises:
+        HTTPException: 409 if carrier with USDOT already exists
+        HTTPException: 500 if creation fails
+    """
     if repo.exists(carrier.usdot):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

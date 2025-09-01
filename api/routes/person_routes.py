@@ -10,7 +10,11 @@ from repositories.target_company_repository import TargetCompanyRepository
 from repositories.carrier_repository import CarrierRepository
 
 
-router = APIRouter(prefix="/persons", tags=["persons"])
+router = APIRouter(
+    prefix="/persons", 
+    tags=["persons"],
+    responses={404: {"description": "Person not found"}}
+)
 person_repo = PersonRepository()
 target_company_repo = TargetCompanyRepository()
 carrier_repo = CarrierRepository()

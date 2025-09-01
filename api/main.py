@@ -1,4 +1,4 @@
-import os
+import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -6,26 +6,44 @@ from fastapi import FastAPI, HTTPException, Depends, Security, status
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
 
+from config import settings
 from database import db
 from routes.person_routes import router as person_router
 from routes.target_company_routes import router as target_company_router
 from routes.carrier_routes import router as carrier_router
 from routes.insurance_provider_routes import router as insurance_provider_router
 
-load_dotenv()
+# Configure logging based on settings
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper()),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(settings.log_file),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # API Key Authentication
-API_KEY = os.getenv("API_KEY")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 async def verify_api_key(api_key: Optional[str] = Security(api_key_header)):
-    """Verify API key for authentication"""
-    if not API_KEY:  # If no API key is set, allow all requests (dev mode)
+    """Verify API key for authentication.
+    
+    Args:
+        api_key: The API key from the X-API-Key header
+        
+    Returns:
+        True if authentication successful
+        
+    Raises:
+        HTTPException: If API key is invalid or missing
+    """
+    if not settings.api_key:  # If no API key is set, allow all requests (dev mode)
         return True
-    if not api_key or api_key != API_KEY:
+    if not api_key or api_key != settings.api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key"
@@ -35,27 +53,70 @@ async def verify_api_key(api_key: Optional[str] = Security(api_key_header)):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage application lifecycle"""
+    """Manage application lifecycle - startup and shutdown events."""
     # Startup
-    print("Starting RICO API...")
+    logger.info("Starting RICO API...")
     if not db.verify_connectivity():
-        print("WARNING: Cannot connect to Neo4j database")
+        logger.warning("Cannot connect to Neo4j database")
     else:
-        print("Successfully connected to Neo4j database")
+        logger.info("Successfully connected to Neo4j database")
     
     yield
     
     # Shutdown
-    print("Shutting down RICO API...")
+    logger.info("Shutting down RICO API...")
     db.close()
 
 
+# OpenAPI tags for better documentation organization
+tags_metadata = [
+    {
+        "name": "health",
+        "description": "Health check endpoints for monitoring API status",
+    },
+    {
+        "name": "carriers",
+        "description": "Operations related to trucking carriers - create, read, update, delete carriers and manage relationships",
+    },
+    {
+        "name": "target-companies",
+        "description": "Operations for managing large companies that contract with carriers (e.g., JB Hunt)",
+    },
+    {
+        "name": "insurance-providers",
+        "description": "Manage insurance provider entities that insure carriers",
+    },
+    {
+        "name": "persons",
+        "description": "Manage person entities - officers, executives, and other individuals in the trucking network",
+    },
+]
+
 # Create FastAPI app
 app = FastAPI(
-    title="RICO Graph API",
-    description="Graph-based fraud detection system for trucking industry",
-    version="1.0.0",
-    lifespan=lifespan
+    title=settings.app_name,
+    description="""
+    ## Overview
+    RICO (Risk Intelligence for Carrier Operations) is a graph-based fraud detection system 
+    for the trucking industry. It models relationships between carriers, companies, 
+    insurance providers, and people to detect fraudulent patterns.
+    
+    ## Features
+    - **Graph Database**: Neo4j-powered relationship modeling
+    - **Fraud Detection**: Identify suspicious patterns in carrier networks
+    - **Real-time Analysis**: Query complex relationships efficiently
+    - **RESTful API**: Easy integration with external systems
+    
+    ## Authentication
+    Use the `X-API-Key` header for authentication. Contact admin for API key.
+    """,
+    version=settings.app_version,
+    lifespan=lifespan,
+    openapi_tags=tags_metadata,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    debug=settings.debug
 )
 
 # Configure CORS for Cloudflare Worker
@@ -68,23 +129,38 @@ app.add_middleware(
 )
 
 # Health check endpoint (no auth required)
-@app.get("/health")
+@app.get("/health", 
+         tags=["health"],
+         summary="Health Check",
+         description="Check the health status of the API and database connectivity",
+         response_description="Health status information")
 async def health_check():
-    """Health check endpoint"""
+    """Check API and database health status.
+    
+    Returns:
+        dict: Health status with API status, database status, and version
+    """
     db_status = "healthy" if db.verify_connectivity() else "unhealthy"
     return {
         "status": "healthy",
         "database": db_status,
-        "version": "1.0.0"
+        "version": settings.app_version
     }
 
 # Root endpoint
-@app.get("/")
+@app.get("/",
+         summary="API Information",
+         description="Get basic information about the RICO API",
+         response_description="API metadata")
 async def root():
-    """Root endpoint"""
+    """Get basic API information.
+    
+    Returns:
+        dict: API name, version, and documentation URL
+    """
     return {
-        "name": "RICO Graph API",
-        "version": "1.0.0",
+        "name": settings.app_name,
+        "version": settings.app_version,
         "documentation": "/docs"
     }
 
@@ -113,6 +189,12 @@ app.include_router(
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
+    """Handle 404 Not Found errors.
+    
+    Args:
+        request: The incoming request
+        exc: The exception that was raised
+    """
     # If it's an HTTPException with a detail, preserve it
     if hasattr(exc, 'detail'):
         return JSONResponse(
@@ -126,6 +208,13 @@ async def not_found_handler(request, exc):
 
 @app.exception_handler(500)
 async def internal_error_handler(request, exc):
+    """Handle 500 Internal Server errors.
+    
+    Args:
+        request: The incoming request  
+        exc: The exception that was raised
+    """
+    logger.error(f"Internal server error: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"error": "Internal server error"}

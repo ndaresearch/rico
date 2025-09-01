@@ -1,0 +1,4858 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SearchCarriers",
+    "version": "0.0.1",
+    "description": "# 👋 Welcome to the API!\n\nThanks for checking out the API! I'm super excited for you to give it a whirl. 🚀\n\n> **I want your feedback!** 📣\n> \n> What features are you dreaming of? 💡 Found a pesky bug? 🐞 Got a brilliant suggestion? ✨\n>\n> Let me know! Your input is super valuable in helping craft the *best* API possible.\n>\n> Send an email to garrett@searchcarriers.com\n\nHappy searching! \n\n\n## P.S. Getting Started with API Tokens ✍️\n\nTo use this API, you'll need an authentication token. You can generate your API token by:\n\n1. Going to your profile settings\n2. Navigating to the API Tokens section at <a href=\"https://searchcarriers.com/settings/api-tokens\">/settings/api-tokens</a>\n3. Creating a new token with the appropriate permissions\n\nRemember to keep your token secure and never share it publicly! 😉\n\n\n"
+  },
+  "servers": [
+    {
+      "url": "https://searchcarriers.com/api"
+    }
+  ],
+  "security": [
+    {
+      "http": []
+    }
+  ],
+  "paths": {
+    "/v1/search": {
+      "get": {
+        "operationId": "v1.company.search",
+        "description": "The all-in-one search endpoint.\n\nSearch by the super search term or use specific fields to refine",
+        "summary": "Super Search",
+        "tags": [
+          "Search"
+        ],
+        "parameters": [
+          {
+            "name": "superSearchTerm",
+            "in": "query",
+            "description": "Super search a string or phrase",
+            "schema": {
+              "type": "string"
+            },
+            "example": "Trucking or intxlog.com or... anything!"
+          },
+          {
+            "name": "docketNumber",
+            "in": "query",
+            "description": "Docket number (MC/MX/FF)",
+            "schema": {
+              "type": "integer"
+            },
+            "example": "596655"
+          },
+          {
+            "name": "dotNumber",
+            "in": "query",
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            },
+            "example": "1911857"
+          },
+          {
+            "name": "useSuperWideSearch",
+            "in": "query",
+            "description": "Allow super search to find anything remotely related, in case of not having good results with the default behaviour",
+            "deprecated": true,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "useLegacySearch",
+            "in": "query",
+            "description": "Use the old search functionality (boo 👎)",
+            "deprecated": true,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "companyTypes[]",
+            "in": "query",
+            "description": "Company types to filter by",
+            "schema": {
+              "type": "array",
+              "items": {}
+            },
+            "example": [
+              "Broker",
+              "Carrier",
+              "Freight Forwarder",
+              "Shipper",
+              "Registrant",
+              "Intermodal Equipment Provider",
+              "Cargo Tank"
+            ]
+          },
+          {
+            "name": "radiusZipcode",
+            "in": "query",
+            "description": "Radius zipcode to filter by",
+            "schema": {
+              "type": "string"
+            },
+            "example": "10001"
+          },
+          {
+            "name": "radiusMiles",
+            "in": "query",
+            "description": "Radius miles to filter by",
+            "schema": {
+              "type": "integer"
+            },
+            "example": 10
+          },
+          {
+            "name": "addressState",
+            "in": "query",
+            "description": "Address state of the company",
+            "schema": {
+              "type": "string"
+            },
+            "example": "CA"
+          },
+          {
+            "name": "minPowerUnits",
+            "in": "query",
+            "description": "Minimum number of power units",
+            "schema": {
+              "type": "integer"
+            },
+            "example": 1
+          },
+          {
+            "name": "maxPowerUnits",
+            "in": "query",
+            "description": "Maximum number of power units",
+            "schema": {
+              "type": "integer"
+            },
+            "example": 100
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "example": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Company%20v1"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/authority/{docketNumber}/history": {
+      "get": {
+        "operationId": "v1.authority.history",
+        "description": "Retrieves the ordered history for a given authority (MC, FF, or MX number)",
+        "summary": "Get Authority History",
+        "tags": [
+          "Authority"
+        ],
+        "parameters": [
+          {
+            "name": "docketNumber",
+            "in": "path",
+            "required": true,
+            "description": "Docket number (MC, FF, or MX number)",
+            "schema": {
+              "type": "string"
+            },
+            "example": "MC1234"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "example": 100
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuthorityHistory%20v1"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/company/{dotNumber}/insurances": {
+      "get": {
+        "operationId": "v2.company.result.insurances",
+        "summary": "Insurances",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "example": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Insurance%20v2"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/company/{dotNumber}/service-areas": {
+      "get": {
+        "operationId": "v2.company.result.service-areas",
+        "summary": "Service Areas",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "example": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/company/{dotNumber}/physical-geo-location": {
+      "get": {
+        "operationId": "v2.company.result.physical-geo-location",
+        "summary": "Company Physical Geo Location",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`GeoLocationResource v2`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/GeoLocationResource%20v2"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/company/truck-driver-trailer-count": {
+      "get": {
+        "operationId": "v2.company.truck-driver-trailer-count",
+        "description": "Gets the self-reported truck trailer and driver count for a given company",
+        "summary": "Truck, Trailer & Driver Count",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "docketNumber",
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dot_number": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "trucks": {
+                      "type": "integer"
+                    },
+                    "trailers": {
+                      "type": "integer"
+                    },
+                    "drivers": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "dot_number",
+                    "name",
+                    "trucks",
+                    "trailers",
+                    "drivers"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/company/{dotNumber}/insurances": {
+      "get": {
+        "operationId": "v1.company.result.insurances",
+        "summary": "Insurances",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "example": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Insurance%20v1"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/company/{dotNumber}/inspections": {
+      "get": {
+        "operationId": "v1.company.result.inspections",
+        "summary": "Inspections",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "example": 100
+          },
+          {
+            "name": "sinceMonths",
+            "in": "query",
+            "description": "Number of months to look back",
+            "schema": {
+              "type": "integer",
+              "default": 24
+            },
+            "example": 24
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Inspection%20v1"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/company/{dotNumber}/out-of-service-orders": {
+      "get": {
+        "operationId": "v1.company.result.out-of-service-orders",
+        "summary": "Out of Service Orders",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "example": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OutOfServiceOrder%20v1"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/company/{dotNumber}/safety-summary": {
+      "get": {
+        "operationId": "v1.company.result.safety-summary",
+        "summary": "Safety Summary",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sinceMonths",
+            "in": "query",
+            "description": "Number of months to look back for data",
+            "schema": {
+              "type": "integer",
+              "default": 24
+            },
+            "example": 24
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CompanySafetySummary%20v1"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/company/{dotNumber}/authorities": {
+      "get": {
+        "operationId": "v1.company.result.authorities",
+        "summary": "Authorities",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "example": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuthorityResource%20v1"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/company/{dotNumber}/equipment": {
+      "get": {
+        "operationId": "v1.company.result.equipment",
+        "summary": "Equipment",
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "equipmentType",
+            "in": "query",
+            "description": "Filter by type of equipment (truck, trailer, other)",
+            "schema": {
+              "type": "string"
+            },
+            "example": "truck"
+          },
+          {
+            "name": "vin",
+            "in": "query",
+            "description": "Filter by VIN (Vehicle Identification Number)",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1HGBH41JXMN109186"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "example": 100
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Equipment%20v1"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/company/{dotNumber}/vehicles": {
+      "get": {
+        "operationId": "v1.company.result.vehicles",
+        "description": "Use Equipment instead",
+        "summary": "Vehicles",
+        "deprecated": true,
+        "tags": [
+          "Company Details"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "example": 1
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "description": "Number of results per page",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            },
+            "example": 100
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CompanyVehicle%20v1"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "properties": {
+                        "first": {
+                          "type": "string"
+                        },
+                        "last": {
+                          "type": "string"
+                        },
+                        "prev": {
+                          "type": "string"
+                        },
+                        "next": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "first",
+                        "last",
+                        "prev",
+                        "next"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "from": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "to": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "current_page",
+                        "from",
+                        "last_page",
+                        "path",
+                        "per_page",
+                        "to",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/equipment/details": {
+      "get": {
+        "operationId": "v1.equipment.details",
+        "summary": "Equipment Detail",
+        "tags": [
+          "Equipment"
+        ],
+        "parameters": [
+          {
+            "name": "vin",
+            "in": "query",
+            "description": "VIN to lookup",
+            "schema": {
+              "type": "string"
+            },
+            "example": "12345678901234567"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/v1/inspection/details": {
+      "get": {
+        "operationId": "v1.inspection.details",
+        "summary": "Inspection Details",
+        "tags": [
+          "Inspection"
+        ],
+        "parameters": [
+          {
+            "name": "inspectionId",
+            "in": "query",
+            "description": "id of the inspection",
+            "schema": {
+              "type": "integer"
+            },
+            "example": "5"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/v2/company/{dotNumber}/risk-factors": {
+      "get": {
+        "operationId": "v2.company.result.risk-factors",
+        "summary": "Safety Measurement System Rating",
+        "tags": [
+          "Vetting"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/export": {
+      "get": {
+        "operationId": "v1.company.export",
+        "description": "Export the provided companies as the specific format",
+        "summary": "Export/Download companies",
+        "tags": [
+          "Export"
+        ],
+        "parameters": [
+          {
+            "name": "dot_numbers",
+            "in": "query",
+            "description": "DOT numbers to export",
+            "schema": {
+              "type": "array",
+              "items": {}
+            },
+            "example": [
+              1234567,
+              7654321
+            ]
+          },
+          {
+            "name": "file_format",
+            "in": "query",
+            "description": "Format to export (json, csv, tsv)",
+            "schema": {
+              "type": "string"
+            },
+            "example": "csv"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/v1/company/{dotNumber}/watch": {
+      "post": {
+        "operationId": "v1.company.watch.store",
+        "description": "Update the watch types for a company for the authenticated user.",
+        "summary": "Update Company Watches",
+        "tags": [
+          "Company Watches"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "watch_types": {
+                    "type": "array",
+                    "description": "Array of watch types to sync",
+                    "example": [
+                      "all",
+                      "details",
+                      "inspections"
+                    ],
+                    "items": {}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "v1.company.watch.view",
+        "description": "Get all company watches for the authenticated user filtered by dot number.",
+        "summary": "Get Company Watches",
+        "tags": [
+          "Company Watches"
+        ],
+        "parameters": [
+          {
+            "name": "dotNumber",
+            "in": "path",
+            "required": true,
+            "description": "Department of Transportation Number",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "company_id": {
+                            "type": "integer"
+                          },
+                          "watch_type": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "company_id",
+                          "watch_type",
+                          "created_at",
+                          "updated_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/company/watch": {
+      "get": {
+        "operationId": "v1.company.watch.index",
+        "description": "Get all company watches for the authenticated user",
+        "summary": "Get All Company Watches",
+        "tags": [
+          "Company Watches"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "company_id": {
+                            "type": "integer"
+                          },
+                          "watch_type": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "company_id",
+                          "watch_type",
+                          "created_at",
+                          "updated_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/search/scac": {
+      "get": {
+        "operationId": "v1.scac.search",
+        "description": "Returns information related to a SCAC",
+        "summary": "Search by SCAC",
+        "tags": [
+          "Search"
+        ],
+        "parameters": [
+          {
+            "name": "scac",
+            "in": "query",
+            "description": "SCAC to search for",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Scac v1`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Scac%20v1"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/search/by-vin/{vin}": {
+      "get": {
+        "operationId": "v1.company.search.by-vin",
+        "description": "Get all related companies for a given VIN.",
+        "summary": "Get Related Companies by VIN",
+        "tags": [
+          "Search"
+        ],
+        "parameters": [
+          {
+            "name": "vin",
+            "in": "path",
+            "required": true,
+            "description": "Vehicle Identification Number",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "company": {
+                            "type": "object"
+                          },
+                          "related_date": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "company",
+                          "related_date"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "http": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "AuthorityHistory v1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "docket_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dot_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "authority_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "authority_types": {
+            "type": "object",
+            "properties": {
+              "common": {
+                "type": "string"
+              },
+              "contract": {
+                "type": "string"
+              },
+              "broker": {
+                "type": "string"
+              },
+              "freight_forwarder": {
+                "type": "string"
+              },
+              "temporary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "common",
+              "contract",
+              "broker",
+              "freight_forwarder",
+              "temporary"
+            ]
+          },
+          "authority_sub_types": {
+            "type": "object",
+            "properties": {
+              "property": {
+                "type": "string"
+              },
+              "passenger": {
+                "type": "string"
+              },
+              "household_goods": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "property",
+              "passenger",
+              "household_goods"
+            ]
+          },
+          "original_action": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "served_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "description",
+              "served_date"
+            ]
+          },
+          "final_action": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "decided_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "served_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "description",
+              "decided_date",
+              "served_date"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "docket_number",
+          "dot_number",
+          "authority_description",
+          "authority_types",
+          "authority_sub_types",
+          "original_action"
+        ],
+        "title": "AuthorityHistory v1"
+      },
+      "AuthorityResource v1": {
+        "type": "object",
+        "properties": {
+          "dot_number": {
+            "type": "string"
+          },
+          "docket_number": {
+            "type": "string"
+          },
+          "broker_authority_status": {
+            "type": "string"
+          },
+          "contract_authority_status": {
+            "type": "string"
+          },
+          "common_authority_status": {
+            "type": "string"
+          },
+          "sub_types": {
+            "type": "object",
+            "properties": {
+              "passenger": {
+                "type": "string"
+              },
+              "property": {
+                "type": "string"
+              },
+              "household_goods": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "passenger",
+              "property",
+              "household_goods"
+            ]
+          },
+          "status_since_date": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "dot_number",
+          "docket_number",
+          "broker_authority_status",
+          "contract_authority_status",
+          "common_authority_status",
+          "sub_types",
+          "status_since_date"
+        ],
+        "title": "AuthorityResource v1"
+      },
+      "Company v1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "dot_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "docket_numbers": {
+            "type": "string"
+          },
+          "legal_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dba_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dun_bradstreet_no": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mcs150_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "add_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phy_omc_region": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "safety_inv_terr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier_operation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "business_org_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "business_org_desc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mcs150_mileage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mcs150_mileage_year": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mcs151_mileage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total_cars": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mcs150_update_code_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prior_revoke_flag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prior_revoke_dot_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fax": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cell_phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "truck_units": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "power_units": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "bus_units": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fleetsize": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "review_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recordable_crash_rate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mail_nationality_indicator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phy_nationality_indicator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phy_barrio": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mail_barrio": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carship": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {}
+          },
+          "pointnum": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total_intrastate_drivers": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mcsipstep": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mcsipdate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hm_ind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "interstate_beyond_100_miles": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "interstate_within_100_miles": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "intrastate_beyond_100_miles": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "intrastate_within_100_miles": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total_cdl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total_drivers": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "avg_drivers_leased_per_month": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "operation_classifications": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {}
+          },
+          "phy_street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phy_city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phy_state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phy_zip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phy_country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phy_cnty": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier_mailing_street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier_mailing_city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier_mailing_state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier_mailing_zip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier_mailing_country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier_mailing_cnty": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier_mailing_und_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driver_inter_total": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "review_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "review_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "safety_rating": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "safety_rating_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "undeliv_phy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_genfreight": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Cargo fields"
+          },
+          "crgo_household": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_metalsheet": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_motoveh": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_drivetow": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_logpole": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_bldgmat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_mobilehome": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_machlrg": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_produce": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_liqgas": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_intermodal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_passengers": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_oilfield": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_livestock": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_grainfeed": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_coalcoke": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_meat": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_garbage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_usmail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_chem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_drybulk": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_coldfood": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_beverages": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_paperprod": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_utility": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_farmsupp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_construct": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_waterwell": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_cargoothr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crgo_cargoothr_desc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owntruck": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Equipment units"
+          },
+          "owntract": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owntrail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owncoach": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownschool_1_8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownschool_9_15": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownschool_16": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownbus_16": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownvan_1_8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownvan_9_15": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownlimo_1_8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownlimo_9_15": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownlimo_16": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmtruck": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmtract": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmtrail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmcoach": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmschool_1_8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmschool_9_15": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmschool_16": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmbus_16": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmvan_1_8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmvan_9_15": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmlimo_1_8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmlimo_9_15": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trmlimo_16": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trptruck": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trptract": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trptrail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trpcoach": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trpschool_1_8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trpschool_9_15": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trpschool_16": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trpbus_16": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trpvan_1_8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trpvan_9_15": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trplimo_1_8": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trplimo_9_15": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trplimo_16": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cargo_carried": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "company_officers": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {}
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "scac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "dot_number",
+          "docket_numbers",
+          "legal_name",
+          "dba_name",
+          "dun_bradstreet_no",
+          "status_code",
+          "mcs150_date",
+          "add_date",
+          "phy_omc_region",
+          "safety_inv_terr",
+          "carrier_operation",
+          "business_org_id",
+          "business_org_desc",
+          "mcs150_mileage",
+          "mcs150_mileage_year",
+          "mcs151_mileage",
+          "total_cars",
+          "mcs150_update_code_id",
+          "prior_revoke_flag",
+          "prior_revoke_dot_number",
+          "phone",
+          "fax",
+          "cell_phone",
+          "truck_units",
+          "power_units",
+          "bus_units",
+          "fleetsize",
+          "review_id",
+          "recordable_crash_rate",
+          "mail_nationality_indicator",
+          "phy_nationality_indicator",
+          "phy_barrio",
+          "mail_barrio",
+          "carship",
+          "pointnum",
+          "total_intrastate_drivers",
+          "mcsipstep",
+          "mcsipdate",
+          "hm_ind",
+          "interstate_beyond_100_miles",
+          "interstate_within_100_miles",
+          "intrastate_beyond_100_miles",
+          "intrastate_within_100_miles",
+          "total_cdl",
+          "total_drivers",
+          "avg_drivers_leased_per_month",
+          "operation_classifications",
+          "phy_street",
+          "phy_city",
+          "phy_state",
+          "phy_zip",
+          "phy_country",
+          "phy_cnty",
+          "carrier_mailing_street",
+          "carrier_mailing_city",
+          "carrier_mailing_state",
+          "carrier_mailing_zip",
+          "carrier_mailing_country",
+          "carrier_mailing_cnty",
+          "carrier_mailing_und_date",
+          "driver_inter_total",
+          "email_address",
+          "review_type",
+          "review_date",
+          "safety_rating",
+          "safety_rating_date",
+          "undeliv_phy",
+          "crgo_genfreight",
+          "crgo_household",
+          "crgo_metalsheet",
+          "crgo_motoveh",
+          "crgo_drivetow",
+          "crgo_logpole",
+          "crgo_bldgmat",
+          "crgo_mobilehome",
+          "crgo_machlrg",
+          "crgo_produce",
+          "crgo_liqgas",
+          "crgo_intermodal",
+          "crgo_passengers",
+          "crgo_oilfield",
+          "crgo_livestock",
+          "crgo_grainfeed",
+          "crgo_coalcoke",
+          "crgo_meat",
+          "crgo_garbage",
+          "crgo_usmail",
+          "crgo_chem",
+          "crgo_drybulk",
+          "crgo_coldfood",
+          "crgo_beverages",
+          "crgo_paperprod",
+          "crgo_utility",
+          "crgo_farmsupp",
+          "crgo_construct",
+          "crgo_waterwell",
+          "crgo_cargoothr",
+          "crgo_cargoothr_desc",
+          "owntruck",
+          "owntract",
+          "owntrail",
+          "owncoach",
+          "ownschool_1_8",
+          "ownschool_9_15",
+          "ownschool_16",
+          "ownbus_16",
+          "ownvan_1_8",
+          "ownvan_9_15",
+          "ownlimo_1_8",
+          "ownlimo_9_15",
+          "ownlimo_16",
+          "trmtruck",
+          "trmtract",
+          "trmtrail",
+          "trmcoach",
+          "trmschool_1_8",
+          "trmschool_9_15",
+          "trmschool_16",
+          "trmbus_16",
+          "trmvan_1_8",
+          "trmvan_9_15",
+          "trmlimo_1_8",
+          "trmlimo_9_15",
+          "trmlimo_16",
+          "trptruck",
+          "trptract",
+          "trptrail",
+          "trpcoach",
+          "trpschool_1_8",
+          "trpschool_9_15",
+          "trpschool_16",
+          "trpbus_16",
+          "trpvan_1_8",
+          "trpvan_9_15",
+          "trplimo_1_8",
+          "trplimo_9_15",
+          "trplimo_16",
+          "cargo_carried",
+          "company_officers",
+          "created_at",
+          "updated_at",
+          "scac"
+        ],
+        "title": "Company v1"
+      },
+      "CompanySafetySummary v1": {
+        "type": "object",
+        "properties": {
+          "dot_number": {
+            "type": "string"
+          },
+          "total_inspections": {
+            "type": "string"
+          },
+          "total_oos_violations": {
+            "type": "string"
+          },
+          "total_violations": {
+            "type": "string"
+          },
+          "driver_oos_rate": {
+            "type": "string"
+          },
+          "vehicle_oos_rate": {
+            "type": "string"
+          },
+          "total_crashes": {
+            "type": "string"
+          },
+          "crashes_with_fatalities": {
+            "type": "string"
+          },
+          "crashes_with_injuries": {
+            "type": "string"
+          },
+          "crashes_with_tow_away": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dot_number",
+          "total_inspections",
+          "total_oos_violations",
+          "total_violations",
+          "driver_oos_rate",
+          "vehicle_oos_rate",
+          "total_crashes",
+          "crashes_with_fatalities",
+          "crashes_with_injuries",
+          "crashes_with_tow_away"
+        ],
+        "title": "CompanySafetySummary v1"
+      },
+      "CompanyVehicle v1": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "vin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "license_plate_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "license_plate_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "make": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "company_vehicle_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "vin",
+          "license_plate_state",
+          "license_plate_number",
+          "make",
+          "company_vehicle_number"
+        ],
+        "title": "CompanyVehicle v1"
+      },
+      "Equipment v1": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sub_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "license_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "license_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "make": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "company_vehicle_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vin_errors": {
+            "type": "boolean"
+          },
+          "gvwr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trim": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "length": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "sub_type",
+          "vin",
+          "license_state",
+          "license_number",
+          "make",
+          "model",
+          "company_vehicle_number",
+          "year",
+          "vin_errors",
+          "gvwr",
+          "trim",
+          "length"
+        ],
+        "title": "Equipment v1"
+      },
+      "GeoLocationResource v2": {
+        "type": "object",
+        "properties": {
+          "longitude": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latitude": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "street_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "full_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "longitude",
+          "latitude",
+          "zip",
+          "street_name",
+          "city",
+          "state",
+          "full_address"
+        ],
+        "title": "GeoLocationResource v2"
+      },
+      "Inspection v1": {
+        "type": "object",
+        "properties": {
+          "change_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inspection_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dot_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "report_state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "report_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_start_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_end_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "region": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ci_status_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location_desc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "county_code_state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "county_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_level_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "service_center": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "census_source_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_facility": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shipper_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shipping_paper_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cargo_tank": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hazmat_placard_req": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snet_version_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snet_search_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "alcohol_control_sub": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "drug_intrdctn_search": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "drug_intrdctn_arrests": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "size_weight_enf": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "traffic_enf": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "local_enf_jurisdiction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pen_cen_match": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "final_status_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "post_acc_ind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gross_comb_veh_wt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "viol_total": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "oos_total": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driver_viol_total": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driver_oos_total": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vehicle_viol_total": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vehicle_oos_total": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hazmat_viol_total": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hazmat_oos_total": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snet_sequence_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "transaction_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "transaction_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "upload_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "upload_first_byte": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "upload_dot_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "upload_search_indicator": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "census_search_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "snet_input_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_office": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mcmis_add_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_carrier_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_carrier_street": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_carrier_city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_carrier_state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_carrier_zip_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_colonia": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "docket_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_interstate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_carrier_state_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InspectionViolation%20v1"
+            }
+          },
+          "per_units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InspectionPerUnit%20v1"
+            }
+          },
+          "company": {
+            "$ref": "#/components/schemas/Company%20v1"
+          }
+        },
+        "required": [
+          "change_date",
+          "inspection_id",
+          "dot_number",
+          "report_state",
+          "report_number",
+          "insp_date",
+          "insp_start_time",
+          "insp_end_time",
+          "registration_date",
+          "region",
+          "ci_status_code",
+          "location",
+          "location_desc",
+          "county_code_state",
+          "county_code",
+          "insp_level_id",
+          "service_center",
+          "census_source_id",
+          "insp_facility",
+          "shipper_name",
+          "shipping_paper_number",
+          "cargo_tank",
+          "hazmat_placard_req",
+          "snet_version_number",
+          "snet_search_date",
+          "alcohol_control_sub",
+          "drug_intrdctn_search",
+          "drug_intrdctn_arrests",
+          "size_weight_enf",
+          "traffic_enf",
+          "local_enf_jurisdiction",
+          "pen_cen_match",
+          "final_status_date",
+          "post_acc_ind",
+          "gross_comb_veh_wt",
+          "viol_total",
+          "oos_total",
+          "driver_viol_total",
+          "driver_oos_total",
+          "vehicle_viol_total",
+          "vehicle_oos_total",
+          "hazmat_viol_total",
+          "hazmat_oos_total",
+          "snet_sequence_id",
+          "transaction_code",
+          "transaction_date",
+          "upload_date",
+          "upload_first_byte",
+          "upload_dot_number",
+          "upload_search_indicator",
+          "census_search_date",
+          "snet_input_date",
+          "source_office",
+          "mcmis_add_date",
+          "insp_carrier_name",
+          "insp_carrier_street",
+          "insp_carrier_city",
+          "insp_carrier_state",
+          "insp_carrier_zip_code",
+          "insp_colonia",
+          "docket_number",
+          "insp_interstate",
+          "insp_carrier_state_id"
+        ],
+        "title": "Inspection v1"
+      },
+      "InspectionPerUnit v1": {
+        "type": "object",
+        "properties": {
+          "change_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inspection_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_type_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_make": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_license": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_license_state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_vehicle_id_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_decal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insp_unit_decal_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inspection_unit_type": {
+            "type": "string"
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InspectionViolation%20v1"
+            }
+          },
+          "inspection_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "change_date",
+          "inspection_id",
+          "insp_unit_id",
+          "insp_unit_type_id",
+          "insp_unit_number",
+          "insp_unit_make",
+          "insp_unit_company",
+          "insp_unit_license",
+          "insp_unit_license_state",
+          "insp_unit_vehicle_id_number",
+          "insp_unit_decal",
+          "insp_unit_decal_number",
+          "inspection_unit_type",
+          "violations",
+          "inspection_level"
+        ],
+        "title": "InspectionPerUnit v1"
+      },
+      "InspectionViolation v1": {
+        "type": "object",
+        "properties": {
+          "part_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "part_no_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "violation_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "violation_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "driver_oos": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vehicle_oos": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "defect_verification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "citation_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "offender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {}
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "part_no",
+          "part_no_section",
+          "violation_description",
+          "violation_category",
+          "driver_oos",
+          "vehicle_oos",
+          "defect_verification",
+          "citation_number",
+          "unit_id",
+          "offender",
+          "citation"
+        ],
+        "title": "InspectionViolation v1"
+      },
+      "Insurance v1": {
+        "type": "object",
+        "properties": {
+          "prefix_docket_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ins_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "BI&PD",
+                  "Cargo",
+                  "Bond",
+                  "Trust Fund"
+                ]
+              }
+            ]
+          },
+          "ins_class_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "Primary",
+                  "Excess",
+                  "Full Security Limits Under Section 1043.2(b)(1)",
+                  "Full Security Limits Under Section 1043.2(b)(2)"
+                ]
+              }
+            ]
+          },
+          "max_cov_amount": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "underl_lim_amount": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policy_no": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "effective_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ins_form_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name_company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_cancelled": {
+            "type": "string"
+          },
+          "cancelled_effective_date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "prefix_docket_number",
+          "ins_type_code",
+          "ins_class_code",
+          "max_cov_amount",
+          "underl_lim_amount",
+          "policy_no",
+          "effective_date",
+          "ins_form_code",
+          "name_company",
+          "is_cancelled"
+        ],
+        "title": "Insurance v1"
+      },
+      "Insurance v2": {
+        "type": "object",
+        "properties": {
+          "prefix_docket_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ins_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "BI&PD",
+                  "Cargo",
+                  "Bond",
+                  "Trust Fund"
+                ]
+              }
+            ]
+          },
+          "ins_class_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "Primary",
+                  "Excess",
+                  "Full Security Limits Under Section 1043.2(b)(1)",
+                  "Full Security Limits Under Section 1043.2(b)(2)"
+                ]
+              }
+            ]
+          },
+          "coverage_to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "coverage_from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policy_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "effective_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "form_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "insurance_company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_cancelled": {
+            "type": "string"
+          },
+          "is_cancellation_pending": {
+            "type": "string"
+          },
+          "is_renewing": {
+            "type": "string"
+          },
+          "renewing_effective_date": {
+            "type": "string"
+          },
+          "cancellation_effective_date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "prefix_docket_number",
+          "ins_type_code",
+          "ins_class_code",
+          "coverage_to",
+          "coverage_from",
+          "policy_number",
+          "effective_date",
+          "form_code",
+          "insurance_company",
+          "is_cancelled",
+          "is_cancellation_pending",
+          "is_renewing"
+        ],
+        "title": "Insurance v2"
+      },
+      "OutOfServiceOrder v1": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "dot_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dba_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "oos_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "oos_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "rescind_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "dot_number",
+          "legal_name",
+          "dba_name",
+          "oos_date",
+          "oos_reason",
+          "status",
+          "created_at",
+          "updated_at",
+          "rescind_date"
+        ],
+        "title": "OutOfServiceOrder v1"
+      },
+      "Scac v1": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "company": {
+            "$ref": "#/components/schemas/Company%20v1"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "title": "Scac v1"
+      }
+    }
+  }
+}

@@ -6,10 +6,21 @@ from models.carrier import Carrier
 
 
 class CarrierRepository(BaseRepository):
-    """Repository for Carrier entity operations"""
+    """Repository for Carrier entity operations in Neo4j graph database.
+    
+    Handles CRUD operations for carriers and manages their relationships
+    with target companies, insurance providers, and officers.
+    """
     
     def create(self, carrier: Carrier) -> Dict:
-        """Create a new carrier node"""
+        """Create a new carrier node in the graph database.
+        
+        Args:
+            carrier: Carrier model with all required properties
+            
+        Returns:
+            dict: Created carrier node data or None if creation fails
+        """
         query = """
         CREATE (c:Carrier {
             usdot: $usdot,
@@ -51,7 +62,14 @@ class CarrierRepository(BaseRepository):
         return result[0]['c'] if result else None
     
     def get_by_usdot(self, usdot: int) -> Optional[Dict]:
-        """Get a carrier by USDOT number"""
+        """Get a carrier by USDOT number.
+        
+        Args:
+            usdot: The USDOT number to search for
+            
+        Returns:
+            dict: Carrier data if found, None otherwise
+        """
         query = """
         MATCH (c:Carrier {usdot: $usdot})
         RETURN c
@@ -60,7 +78,22 @@ class CarrierRepository(BaseRepository):
         return result[0]['c'] if result else None
     
     def get_all(self, skip: int = 0, limit: int = 100, filters: Dict = None) -> List[Dict]:
-        """Get all carriers with pagination and filters"""
+        """Get all carriers with pagination and optional filters.
+        
+        Args:
+            skip: Number of records to skip (for pagination)
+            limit: Maximum number of records to return
+            filters: Optional dict with filter criteria:
+                - jb_carrier: bool - Filter by JB Hunt carrier status
+                - min_trucks: int - Minimum number of trucks
+                - min_violations: int - Minimum number of violations
+                - min_crashes: int - Minimum number of crashes
+                - min_driver_oos_rate: float - Minimum driver OOS rate
+                - insurance_provider: str - Filter by insurance provider name
+                
+        Returns:
+            list: List of carrier dictionaries matching the criteria
+        """
         where_clauses = []
         params = {"skip": skip, "limit": limit}
         
@@ -104,7 +137,15 @@ class CarrierRepository(BaseRepository):
         return [record['c'] for record in result]
     
     def update(self, usdot: int, updates: Dict) -> Optional[Dict]:
-        """Update a carrier's properties"""
+        """Update a carrier's properties.
+        
+        Args:
+            usdot: The USDOT number of the carrier to update
+            updates: Dictionary of properties to update
+            
+        Returns:
+            dict: Updated carrier data if successful, None otherwise
+        """
         # Build SET clause dynamically
         set_clauses = []
         params = {"usdot": usdot}
@@ -137,7 +178,16 @@ class CarrierRepository(BaseRepository):
         return result[0]['c'] if result else None
     
     def delete(self, usdot: int) -> bool:
-        """Delete a carrier and its relationships"""
+        """Delete a carrier and all its relationships.
+        
+        Uses DETACH DELETE to remove the carrier node and all connected edges.
+        
+        Args:
+            usdot: The USDOT number of the carrier to delete
+            
+        Returns:
+            bool: True if carrier was deleted, False if not found
+        """
         query = """
         MATCH (c:Carrier {usdot: $usdot})
         DETACH DELETE c
@@ -147,7 +197,14 @@ class CarrierRepository(BaseRepository):
         return result[0]['deleted'] > 0 if result else False
     
     def exists(self, usdot: int) -> bool:
-        """Check if a carrier exists"""
+        """Check if a carrier exists by USDOT number.
+        
+        Args:
+            usdot: The USDOT number to check
+            
+        Returns:
+            bool: True if carrier exists, False otherwise
+        """
         query = """
         MATCH (c:Carrier {usdot: $usdot})
         RETURN count(c) > 0 as exists
@@ -156,7 +213,12 @@ class CarrierRepository(BaseRepository):
         return result[0]['exists'] if result else False
     
     def get_statistics(self) -> Dict:
-        """Get carrier statistics"""
+        """Get aggregate statistics for all carriers.
+        
+        Returns:
+            dict: Statistics including total carriers, averages for trucks,
+                  violations, crashes, and safety rates
+        """
         query = """
         MATCH (c:Carrier)
         RETURN 

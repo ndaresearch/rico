@@ -5,7 +5,11 @@ from models.insurance_provider import InsuranceProvider
 from repositories.insurance_provider_repository import InsuranceProviderRepository
 
 
-router = APIRouter(prefix="/insurance-providers", tags=["insurance-providers"])
+router = APIRouter(
+    prefix="/insurance-providers", 
+    tags=["insurance-providers"],
+    responses={404: {"description": "Insurance provider not found"}}
+)
 repo = InsuranceProviderRepository()
 
 
