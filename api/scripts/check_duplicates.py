@@ -9,7 +9,7 @@ from neo4j import GraphDatabase
 # Database connection
 uri = "bolt://localhost:7687"
 user = "neo4j"
-password = "password"
+password = "ricograph123"
 
 driver = GraphDatabase.driver(uri, auth=(user, password))
 

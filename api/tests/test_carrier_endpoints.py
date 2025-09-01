@@ -578,3 +578,90 @@ def test_officer_deduplication():
     
     # Clean up
     person_repo.delete(person_id1)
+
+
+def test_create_contract_idempotent():
+    """Test that creating the same contract twice doesn't create duplicates"""
+    # Create a target company
+    target_data = TargetCompany(
+        dot_number=888999,
+        legal_name="Test Target Company",
+        entity_type="BROKER"
+    )
+    target_repo.create(target_data)
+    
+    # Create a carrier
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier",
+        "primary_officer": "Test Officer"
+    }
+    client.post("/carriers/", json=carrier_data, headers=headers)
+    
+    # Create contract first time
+    contract_data = {
+        "target_dot_number": 888999,
+        "active": True
+    }
+    response1 = client.post("/carriers/777001/contract", json=contract_data, headers=headers)
+    assert response1.status_code == 201
+    assert "Contract created successfully" in response1.json()["message"]
+    
+    # Create same contract again - should be idempotent
+    response2 = client.post("/carriers/777001/contract", json=contract_data, headers=headers)
+    assert response2.status_code == 200  # Should return 200 for existing
+    assert "already exists" in response2.json()["message"]
+    
+    # Verify only one relationship exists in database
+    from database import db
+    with db.get_session() as session:
+        result = session.run("""
+            MATCH (tc:TargetCompany {dot_number: 888999})-[r:CONTRACTS_WITH]->(c:Carrier {usdot: 777001})
+            RETURN count(r) as count
+        """)
+        record = result.single()
+        assert record["count"] == 1
+
+
+def test_link_officer_idempotent():
+    """Test that linking the same officer twice is properly handled"""
+    # Create a carrier
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier LLC",
+        "primary_officer": "John Manager"
+    }
+    client.post("/carriers/", json=carrier_data, headers=headers)
+    
+    # Link to officer first time
+    response1 = client.post(
+        "/carriers/777001/officer",
+        json={"officer_name": "John Manager"},
+        headers=headers
+    )
+    assert response1.status_code == 201
+    person_id = response1.json()["person_id"]
+    
+    # Try to link again - should fail with 409 (for backward compatibility)
+    response2 = client.post(
+        "/carriers/777001/officer",
+        json={"officer_name": "John Manager"},
+        headers=headers
+    )
+    assert response2.status_code == 409
+    assert "already linked" in response2.json()["detail"]
+    
+    # Verify only one relationship exists in database
+    from database import db
+    with db.get_session() as session:
+        result = session.run("""
+            MATCH (c:Carrier {usdot: 777001})-[r:MANAGED_BY]->(p:Person)
+            RETURN count(r) as count
+        """)
+        record = result.single()
+        assert record["count"] == 1
+    
+    # Clean up
+    from repositories.person_repository import PersonRepository
+    person_repo = PersonRepository()
+    person_repo.delete(person_id)

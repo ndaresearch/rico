@@ -181,22 +181,27 @@ class CarrierRepository(BaseRepository):
         query = """
         MATCH (c:Carrier {usdot: $usdot})
         MATCH (tc:TargetCompany {dot_number: $dot_number})
-        CREATE (tc)-[r:CONTRACTS_WITH {
-            start_date: $start_date,
-            end_date: $end_date,
-            active: $active,
-            created_at: $created_at
-        }]->(c)
+        MERGE (tc)-[r:CONTRACTS_WITH]->(c)
+        ON CREATE SET 
+            r.start_date = $start_date,
+            r.end_date = $end_date,
+            r.active = $active,
+            r.created_at = $created_at
+        ON MATCH SET 
+            r.updated_at = $updated_at,
+            r.active = $active
         RETURN r
         """
         
+        now = datetime.now(timezone.utc).isoformat()
         params = {
             "usdot": usdot,
             "dot_number": dot_number,
             "start_date": contract_start,
             "end_date": contract_end,
             "active": active,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": now,
+            "updated_at": now
         }
         
         result = self.execute_query(query, params)
@@ -235,16 +240,20 @@ class CarrierRepository(BaseRepository):
         query = """
         MATCH (c:Carrier {usdot: $usdot})
         MATCH (p:Person {person_id: $person_id})
-        CREATE (c)-[r:MANAGED_BY {
-            created_at: $created_at
-        }]->(p)
+        MERGE (c)-[r:MANAGED_BY]->(p)
+        ON CREATE SET 
+            r.created_at = $created_at
+        ON MATCH SET 
+            r.updated_at = $updated_at
         RETURN r
         """
         
+        now = datetime.now(timezone.utc).isoformat()
         params = {
             "usdot": usdot,
             "person_id": person_id,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": now,
+            "updated_at": now
         }
         
         result = self.execute_query(query, params)

@@ -200,22 +200,28 @@ class PersonRepository(BaseRepository):
         query = """
         MATCH (tc:TargetCompany {dot_number: $dot_number})
         MATCH (p:Person {person_id: $person_id})
-        CREATE (tc)-[r:HAS_EXECUTIVE {
-            role: $role,
-            start_date: $start_date,
-            end_date: $end_date,
-            created_at: $created_at
-        }]->(p)
+        MERGE (tc)-[r:HAS_EXECUTIVE]->(p)
+        ON CREATE SET 
+            r.role = $role,
+            r.start_date = $start_date,
+            r.end_date = $end_date,
+            r.created_at = $created_at
+        ON MATCH SET 
+            r.role = $role,
+            r.end_date = $end_date,
+            r.updated_at = $updated_at
         RETURN r
         """
         
+        now = datetime.now(timezone.utc).isoformat()
         params = {
             "dot_number": dot_number,
             "person_id": person_id,
             "role": role,
             "start_date": start_date.isoformat() if start_date else date.today().isoformat(),
             "end_date": end_date.isoformat() if end_date else None,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": now,
+            "updated_at": now
         }
         
         result = self.execute_query(query, params)
