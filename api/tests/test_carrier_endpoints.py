@@ -401,3 +401,180 @@ def test_get_carrier_with_insurance_relationship():
     data = response.json()
     assert data["insurance_provider"] == "Test Insurance Co"
     assert data["insurance_amount"] == 1000000
+
+
+def test_link_carrier_to_officer_by_name():
+    """Test linking carrier to officer by creating new person"""
+    # Create a carrier first
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier LLC",
+        "primary_officer": "Jane Smith"
+    }
+    client.post("/carriers/", json=carrier_data, headers=headers)
+    
+    # Link to officer by name (should create person)
+    response = client.post(
+        "/carriers/777001/officer",
+        json={"officer_name": "Jane Smith"},
+        headers=headers
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["officer_name"] == "Jane Smith"
+    assert data["carrier_usdot"] == 777001
+    assert "person_id" in data
+    
+    # Clean up person
+    from repositories.person_repository import PersonRepository
+    person_repo = PersonRepository()
+    person_repo.delete(data["person_id"])
+
+
+def test_link_carrier_to_officer_by_id():
+    """Test linking carrier to existing officer by person_id"""
+    from repositories.person_repository import PersonRepository
+    from models.person import Person
+    
+    # Create a person first
+    person_repo = PersonRepository()
+    person = Person(person_id="", full_name="Test Officer", source=["TEST"])
+    created_person = person_repo.create(person)
+    person_id = created_person["person_id"]
+    
+    # Create a carrier
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier LLC",
+        "primary_officer": "Test Officer"
+    }
+    client.post("/carriers/", json=carrier_data, headers=headers)
+    
+    # Link to officer by ID
+    response = client.post(
+        "/carriers/777001/officer",
+        json={"person_id": person_id},
+        headers=headers
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["person_id"] == person_id
+    assert data["officer_name"] == "Test Officer"
+    
+    # Clean up
+    person_repo.delete(person_id)
+
+
+def test_link_carrier_to_officer_duplicate():
+    """Test that duplicate officer relationships are rejected"""
+    # Create a carrier
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier LLC",
+        "primary_officer": "John Manager"
+    }
+    client.post("/carriers/", json=carrier_data, headers=headers)
+    
+    # Link to officer first time
+    response1 = client.post(
+        "/carriers/777001/officer",
+        json={"officer_name": "John Manager"},
+        headers=headers
+    )
+    assert response1.status_code == 201
+    person_id = response1.json()["person_id"]
+    
+    # Try to link again - should fail with 409
+    response2 = client.post(
+        "/carriers/777001/officer",
+        json={"officer_name": "John Manager"},
+        headers=headers
+    )
+    assert response2.status_code == 409
+    assert "already linked" in response2.json()["detail"]
+    
+    # Clean up
+    from repositories.person_repository import PersonRepository
+    person_repo = PersonRepository()
+    person_repo.delete(person_id)
+
+
+def test_link_nonexistent_carrier_to_officer():
+    """Test linking non-existent carrier returns 404"""
+    response = client.post(
+        "/carriers/999999/officer",
+        json={"officer_name": "Some Officer"},
+        headers=headers
+    )
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"]
+
+
+def test_link_carrier_to_officer_no_data():
+    """Test linking without name or ID returns 400"""
+    # Create a carrier
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier LLC",
+        "primary_officer": "Some Officer"
+    }
+    create_response = client.post("/carriers/", json=carrier_data, headers=headers)
+    assert create_response.status_code == 201, f"Failed to create carrier: {create_response.json()}"
+    
+    # Try to link without providing name or ID
+    response = client.post(
+        "/carriers/777001/officer",
+        json={},
+        headers=headers
+    )
+    assert response.status_code == 400
+    assert "Must provide" in response.json()["detail"]
+
+
+def test_officer_deduplication():
+    """Test that same officer name creates only one person"""
+    # Create two carriers
+    carrier1_data = {
+        "usdot": 777001,
+        "carrier_name": "First Carrier LLC",
+        "primary_officer": "Shared Officer"
+    }
+    carrier2_data = {
+        "usdot": 777002,
+        "carrier_name": "Second Carrier LLC",
+        "primary_officer": "Shared Officer"
+    }
+    client.post("/carriers/", json=carrier1_data, headers=headers)
+    client.post("/carriers/", json=carrier2_data, headers=headers)
+    
+    # Link both to same officer name
+    response1 = client.post(
+        "/carriers/777001/officer",
+        json={"officer_name": "Shared Officer"},
+        headers=headers
+    )
+    assert response1.status_code == 201
+    person_id1 = response1.json()["person_id"]
+    
+    response2 = client.post(
+        "/carriers/777002/officer",
+        json={"officer_name": "Shared Officer"},
+        headers=headers
+    )
+    assert response2.status_code == 201
+    person_id2 = response2.json()["person_id"]
+    
+    # Should have created the same person (deduplication)
+    assert person_id1 == person_id2
+    
+    # Verify both carriers are linked to same person
+    from repositories.person_repository import PersonRepository
+    person_repo = PersonRepository()
+    carriers = person_repo.get_carriers(person_id1)
+    assert len(carriers) == 2
+    usdots = [c["usdot"] for c in carriers]
+    assert 777001 in usdots
+    assert 777002 in usdots
+    
+    # Clean up
+    person_repo.delete(person_id1)

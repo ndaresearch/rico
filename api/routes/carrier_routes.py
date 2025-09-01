@@ -30,6 +30,12 @@ class ContractRequest(BaseModel):
     active: bool = True
 
 
+class OfficerLinkRequest(BaseModel):
+    """Model for linking carrier to officer"""
+    officer_name: Optional[str] = None
+    person_id: Optional[str] = None
+
+
 @router.post("/", response_model=Dict, status_code=status.HTTP_201_CREATED)
 async def create_carrier(carrier: Carrier):
     """Create a new carrier"""
@@ -221,4 +227,86 @@ async def link_carrier_to_insurance(
         "carrier_usdot": usdot,
         "insurance_provider": provider_name,
         "coverage_amount": amount
+    }
+
+
+@router.post("/{usdot}/officer", response_model=Dict, status_code=status.HTTP_201_CREATED)
+async def link_carrier_to_officer(usdot: int, request: OfficerLinkRequest):
+    """
+    Link a carrier to an officer (Person entity).
+    Provide either officer_name (to create/find) or person_id (existing person).
+    """
+    # Check if carrier exists
+    if not repo.exists(usdot):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Carrier with USDOT {usdot} not found"
+        )
+    
+    # Validate request - need either name or ID
+    if not request.officer_name and not request.person_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must provide either officer_name or person_id"
+        )
+    
+    # Import here to avoid circular dependency
+    from repositories.person_repository import PersonRepository
+    from models.person import Person
+    
+    person_repo = PersonRepository()
+    
+    # Get or create the person
+    if request.person_id:
+        # Use existing person
+        person = person_repo.get_by_id(request.person_id)
+        if not person:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Person with ID {request.person_id} not found"
+            )
+        person_id = request.person_id
+        officer_name = person['full_name']
+    else:
+        # Create or find person by name
+        person_model = Person(
+            person_id="",  # Will be auto-generated
+            full_name=request.officer_name,
+            source=["API"]
+        )
+        person = person_repo.find_or_create(person_model)
+        person_id = person['person_id']
+        officer_name = request.officer_name
+    
+    # Check if relationship already exists
+    check_query = """
+    MATCH (c:Carrier {usdot: $usdot})-[r:MANAGED_BY]->(p:Person {person_id: $person_id})
+    RETURN count(r) as count
+    """
+    
+    result = repo.execute_query(check_query, {"usdot": usdot, "person_id": person_id})
+    if result and result[0]['count'] > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Carrier {usdot} is already linked to person {officer_name}"
+        )
+    
+    # Create the relationship
+    success = repo.link_to_officer(usdot, person_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create officer relationship"
+        )
+    
+    # Also update the carrier's primary_officer field if provided
+    if request.officer_name:
+        repo.update(usdot, {"primary_officer": request.officer_name})
+    
+    return {
+        "message": "Officer relationship created successfully",
+        "carrier_usdot": usdot,
+        "person_id": person_id,
+        "officer_name": officer_name
     }

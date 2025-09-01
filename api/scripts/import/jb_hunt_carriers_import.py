@@ -302,6 +302,77 @@ def create_insurance_relationships(api_url: str, api_key: str, carriers: List[Di
     return successful, failed
 
 
+def create_officer_relationships(api_url: str, api_key: str, carriers: List[Dict]):
+    """Create Person entities for officers and MANAGED_BY relationships"""
+    headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
+    
+    successful = 0
+    failed = 0
+    skipped = 0
+    officer_person_map = {}  # Track officers we've created
+    
+    print(f"\nCreating officer relationships...")
+    
+    # Count unique officers
+    unique_officers = set()
+    for carrier in carriers:
+        if carrier.get('primary_officer') and carrier['primary_officer'].lower() not in ['n/a', 'na', '']:
+            unique_officers.add(carrier['primary_officer'].strip())
+    
+    print(f"  Found {len(unique_officers)} unique officers")
+    
+    for carrier in carriers:
+        if not carrier['usdot']:
+            continue
+        
+        # Skip if no primary officer or it's n/a
+        if not carrier.get('primary_officer') or carrier['primary_officer'].lower() in ['n/a', 'na', '']:
+            skipped += 1
+            continue
+        
+        officer_name = carrier['primary_officer'].strip()
+        
+        # Create officer relationship (API will handle deduplication)
+        url = f"{api_url}/carriers/{carrier['usdot']}/officer"
+        data = {"officer_name": officer_name}
+        
+        response = requests.post(url, json=data, headers=headers)
+        
+        if response.status_code in [200, 201]:
+            successful += 1
+            if officer_name not in officer_person_map:
+                officer_person_map[officer_name] = response.json().get('person_id')
+            if successful % 10 == 0:
+                print(f"  ✓ Created {successful} officer relationships...")
+        elif response.status_code == 409:
+            # Relationship already exists
+            successful += 1  # Count as success since relationship exists
+        else:
+            failed += 1
+            if failed <= 5:  # Only show first 5 failures
+                print(f"  ✗ Failed to link carrier {carrier['usdot']} to officer {officer_name}: {response.status_code}")
+    
+    print(f"Officer relationships complete: {successful} created, {failed} failed, {skipped} skipped (no officer)")
+    print(f"  Created {len(officer_person_map)} unique Person entities")
+    
+    # Check for fraud indicators
+    officer_carriers = {}
+    for carrier in carriers:
+        if carrier.get('primary_officer') and carrier['primary_officer'].lower() not in ['n/a', 'na', '']:
+            officer = carrier['primary_officer'].strip()
+            if officer not in officer_carriers:
+                officer_carriers[officer] = []
+            officer_carriers[officer].append(carrier['carrier_name'])
+    
+    multi_carrier_officers = {k: v for k, v in officer_carriers.items() if len(v) > 1}
+    if multi_carrier_officers:
+        print(f"\n  ⚠️  Found {len(multi_carrier_officers)} officers managing multiple carriers (fraud indicator)")
+        for officer, carrier_names in list(multi_carrier_officers.items())[:3]:  # Show first 3
+            print(f"    - {officer}: {len(carrier_names)} carriers")
+    
+    return successful, failed
+
+
 def main():
     """Main import function"""
     # Configuration
@@ -345,6 +416,10 @@ def main():
     print("\n6. Creating insurance relationships...")
     ins_success, ins_failed = create_insurance_relationships(API_URL, API_KEY, carriers)
     
+    # Step 7: Create officer relationships
+    print("\n7. Creating officer relationships...")
+    off_success, off_failed = create_officer_relationships(API_URL, API_KEY, carriers)
+    
     # Summary
     print("\n" + "=" * 60)
     print("IMPORT SUMMARY")
@@ -352,9 +427,17 @@ def main():
     print(f"Carriers imported: {successful}/{len(carriers)}")
     print(f"Carrier-JB Hunt relationships: {rel_success}/{len(carriers)}")
     print(f"Insurance relationships: {ins_success}/{len(carriers) - 2}")  # -2 for carriers with n/a insurance
+    print(f"Officer relationships: {off_success}/{len(carriers)}")
     print(f"Insurance providers: {len(insurance_providers)}")
     
-    if failed > 0 or rel_failed > 0 or ins_failed > 0:
+    # Count unique officers
+    unique_officers = set()
+    for carrier in carriers:
+        if carrier.get('primary_officer') and carrier['primary_officer'].lower() not in ['n/a', 'na', '']:
+            unique_officers.add(carrier['primary_officer'].strip())
+    print(f"Unique officers (Person entities): {len(unique_officers)}")
+    
+    if failed > 0 or rel_failed > 0 or ins_failed > 0 or off_failed > 0:
         print(f"\n⚠ Some operations failed. Check logs for details.")
         sys.exit(1)
     else:
