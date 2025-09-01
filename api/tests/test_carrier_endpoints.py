@@ -17,13 +17,22 @@ headers = {"X-API-Key": "test-api-key"}
 @pytest.fixture(autouse=True)
 def cleanup():
     """Clean up test data before and after each test"""
+    from repositories.insurance_provider_repository import InsuranceProviderRepository
+    insurance_repo = InsuranceProviderRepository()
+    
     # Clean before
     test_usdots = [777001, 777002, 777003]
     test_dot = 888999  # For target company
+    test_insurance = "Test Insurance Co"  # For insurance tests
     
     for usdot in test_usdots:
         carrier_repo.delete(usdot)
     target_repo.delete(test_dot)
+    
+    # Clean insurance provider
+    provider = insurance_repo.get_by_name(test_insurance)
+    if provider:
+        insurance_repo.delete(provider["provider_id"])
     
     yield
     
@@ -31,6 +40,11 @@ def cleanup():
     for usdot in test_usdots:
         carrier_repo.delete(usdot)
     target_repo.delete(test_dot)
+    
+    # Clean insurance provider
+    provider = insurance_repo.get_by_name(test_insurance)
+    if provider:
+        insurance_repo.delete(provider["provider_id"])
 
 
 def test_create_carrier():
@@ -239,3 +253,151 @@ def test_bulk_create_carriers():
     for carrier in carriers_data:
         response = client.get(f"/carriers/{carrier['usdot']}", headers=headers)
         assert response.status_code == 200
+
+
+def test_link_carrier_to_insurance_success():
+    """Test linking carrier to insurance provider"""
+    # Import here to avoid issues
+    from repositories.insurance_provider_repository import InsuranceProviderRepository
+    from models.insurance_provider import InsuranceProvider
+    insurance_repo = InsuranceProviderRepository()
+    
+    # Create a carrier
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier LLC",
+        "primary_officer": "John Doe"
+    }
+    client.post("/carriers/", json=carrier_data, headers=headers)
+    
+    # Create an insurance provider
+    provider = InsuranceProvider(name="Test Insurance Co", data_source="TEST")
+    insurance_repo.create(provider)
+    
+    # Link them
+    response = client.post(
+        "/carriers/777001/insurance",
+        params={"provider_name": "Test Insurance Co", "amount": 1000000},
+        headers=headers
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "success" in data["message"]
+    assert data["carrier_usdot"] == 777001
+    assert data["insurance_provider"] == "Test Insurance Co"
+    assert data["coverage_amount"] == 1000000
+
+
+def test_link_carrier_to_nonexistent_insurance():
+    """Test linking carrier to non-existent insurance provider"""
+    # Create a carrier
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier LLC",
+        "primary_officer": "John Doe"
+    }
+    client.post("/carriers/", json=carrier_data, headers=headers)
+    
+    # Try to link to non-existent provider
+    response = client.post(
+        "/carriers/777001/insurance",
+        params={"provider_name": "NonExistent Insurance"},
+        headers=headers
+    )
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"]
+
+
+def test_link_nonexistent_carrier_to_insurance():
+    """Test linking non-existent carrier to insurance"""
+    # Import here to avoid issues
+    from repositories.insurance_provider_repository import InsuranceProviderRepository
+    from models.insurance_provider import InsuranceProvider
+    insurance_repo = InsuranceProviderRepository()
+    
+    # Create an insurance provider
+    provider = InsuranceProvider(name="Test Insurance Co", data_source="TEST")
+    insurance_repo.create(provider)
+    
+    # Try to link non-existent carrier
+    response = client.post(
+        "/carriers/999999/insurance",
+        params={"provider_name": "Test Insurance Co"},
+        headers=headers
+    )
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"]
+
+
+def test_link_carrier_insurance_idempotent():
+    """Test that creating insurance link twice is idempotent"""
+    # Import here to avoid issues
+    from repositories.insurance_provider_repository import InsuranceProviderRepository
+    from models.insurance_provider import InsuranceProvider
+    insurance_repo = InsuranceProviderRepository()
+    
+    # Create a carrier
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier LLC",
+        "primary_officer": "John Doe"
+    }
+    client.post("/carriers/", json=carrier_data, headers=headers)
+    
+    # Create an insurance provider
+    provider = InsuranceProvider(name="Test Insurance Co", data_source="TEST")
+    insurance_repo.create(provider)
+    
+    # Link them first time
+    response1 = client.post(
+        "/carriers/777001/insurance",
+        params={"provider_name": "Test Insurance Co", "amount": 1000000},
+        headers=headers
+    )
+    assert response1.status_code == 200
+    
+    # Link them second time (should update, not fail)
+    response2 = client.post(
+        "/carriers/777001/insurance",
+        params={"provider_name": "Test Insurance Co", "amount": 750000},
+        headers=headers
+    )
+    assert response2.status_code == 200
+    data = response2.json()
+    assert data["coverage_amount"] == 750000  # Should update to new amount
+
+
+def test_get_carrier_with_insurance_relationship():
+    """Test getting carrier shows insurance relationship data"""
+    # Import here to avoid issues
+    from repositories.insurance_provider_repository import InsuranceProviderRepository
+    from models.insurance_provider import InsuranceProvider
+    insurance_repo = InsuranceProviderRepository()
+    
+    # Create a carrier with insurance data
+    carrier_data = {
+        "usdot": 777001,
+        "carrier_name": "Test Carrier LLC",
+        "primary_officer": "John Doe",
+        "insurance_provider": "Test Insurance Co",
+        "insurance_amount": 1000000
+    }
+    client.post("/carriers/", json=carrier_data, headers=headers)
+    
+    # Create the insurance provider
+    provider = InsuranceProvider(name="Test Insurance Co", data_source="TEST")
+    insurance_repo.create(provider)
+    
+    # Create the relationship
+    client.post(
+        "/carriers/777001/insurance",
+        params={"provider_name": "Test Insurance Co", "amount": 1000000},
+        headers=headers
+    )
+    
+    # Get carrier and verify insurance data
+    response = client.get("/carriers/777001", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["insurance_provider"] == "Test Insurance Co"
+    assert data["insurance_amount"] == 1000000

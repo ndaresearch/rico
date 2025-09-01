@@ -179,3 +179,46 @@ async def bulk_create_carriers(carriers: List[Carrier]):
     
     result = repo.bulk_create(carriers)
     return result
+
+
+@router.post("/{usdot}/insurance", response_model=Dict)
+async def link_carrier_to_insurance(
+    usdot: int,
+    provider_name: str = Query(..., description="Name of the insurance provider"),
+    amount: Optional[float] = Query(None, description="Insurance coverage amount")
+):
+    """Create INSURED_BY relationship between carrier and insurance provider"""
+    # Check if carrier exists
+    if not repo.exists(usdot):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Carrier with USDOT {usdot} not found"
+        )
+    
+    # Import here to avoid circular dependency
+    from repositories.insurance_provider_repository import InsuranceProviderRepository
+    insurance_repo = InsuranceProviderRepository()
+    
+    # Check if insurance provider exists
+    provider = insurance_repo.get_by_name(provider_name)
+    if not provider:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Insurance provider '{provider_name}' not found"
+        )
+    
+    # Create the relationship
+    success = repo.link_to_insurance_provider(usdot, provider_name, amount)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create insurance relationship"
+        )
+    
+    return {
+        "message": "Insurance relationship created successfully",
+        "carrier_usdot": usdot,
+        "insurance_provider": provider_name,
+        "coverage_amount": amount
+    }

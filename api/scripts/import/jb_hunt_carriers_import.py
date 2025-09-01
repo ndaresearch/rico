@@ -260,6 +260,48 @@ def create_carrier_relationships(api_url: str, api_key: str, carriers: List[Dict
     return successful, failed
 
 
+def create_insurance_relationships(api_url: str, api_key: str, carriers: List[Dict]):
+    """Create INSURED_BY relationships between carriers and insurance providers"""
+    headers = {"X-API-Key": api_key}
+    
+    successful = 0
+    failed = 0
+    skipped = 0
+    
+    print(f"\nCreating insurance relationships...")
+    
+    for carrier in carriers:
+        if not carrier['usdot']:
+            continue
+        
+        # Skip if no insurance provider or it's n/a
+        if not carrier.get('insurance_provider') or carrier['insurance_provider'].lower() in ['n/a', 'na']:
+            skipped += 1
+            continue
+        
+        # Create insurance relationship
+        url = f"{api_url}/carriers/{carrier['usdot']}/insurance"
+        params = {
+            "provider_name": carrier['insurance_provider']
+        }
+        if carrier.get('insurance_amount'):
+            params["amount"] = carrier['insurance_amount']
+        
+        response = requests.post(url, headers=headers, params=params)
+        
+        if response.status_code in [200, 201]:
+            successful += 1
+            if successful % 10 == 0:
+                print(f"  ✓ Created {successful} insurance relationships...")
+        else:
+            failed += 1
+            if failed <= 5:  # Only show first 5 failures
+                print(f"  ✗ Failed to link carrier {carrier['usdot']} to {carrier['insurance_provider']}: {response.status_code}")
+    
+    print(f"Insurance relationships complete: {successful} created, {failed} failed, {skipped} skipped (no insurance)")
+    return successful, failed
+
+
 def main():
     """Main import function"""
     # Configuration
@@ -295,19 +337,24 @@ def main():
     print("\n4. Importing carriers...")
     successful, failed = import_carriers(API_URL, API_KEY, carriers)
     
-    # Step 5: Create relationships
-    print("\n5. Creating relationships...")
+    # Step 5: Create carrier-to-JB Hunt relationships
+    print("\n5. Creating carrier-to-JB Hunt relationships...")
     rel_success, rel_failed = create_carrier_relationships(API_URL, API_KEY, carriers)
+    
+    # Step 6: Create insurance relationships
+    print("\n6. Creating insurance relationships...")
+    ins_success, ins_failed = create_insurance_relationships(API_URL, API_KEY, carriers)
     
     # Summary
     print("\n" + "=" * 60)
     print("IMPORT SUMMARY")
     print("=" * 60)
     print(f"Carriers imported: {successful}/{len(carriers)}")
-    print(f"Relationships created: {rel_success}/{len(carriers)}")
+    print(f"Carrier-JB Hunt relationships: {rel_success}/{len(carriers)}")
+    print(f"Insurance relationships: {ins_success}/{len(carriers) - 2}")  # -2 for carriers with n/a insurance
     print(f"Insurance providers: {len(insurance_providers)}")
     
-    if failed > 0 or rel_failed > 0:
+    if failed > 0 or rel_failed > 0 or ins_failed > 0:
         print(f"\n⚠ Some operations failed. Check logs for details.")
         sys.exit(1)
     else:

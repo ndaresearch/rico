@@ -204,22 +204,27 @@ class CarrierRepository(BaseRepository):
     
     def link_to_insurance_provider(self, usdot: int, provider_name: str, 
                                   amount: Optional[float] = None) -> bool:
-        """Create INSURED_BY relationship to insurance provider"""
+        """Create or update INSURED_BY relationship to insurance provider"""
         query = """
         MATCH (c:Carrier {usdot: $usdot})
         MATCH (ip:InsuranceProvider {name: $provider_name})
-        CREATE (c)-[r:INSURED_BY {
-            amount: $amount,
-            created_at: $created_at
-        }]->(ip)
+        MERGE (c)-[r:INSURED_BY]->(ip)
+        ON CREATE SET 
+            r.amount = $amount,
+            r.created_at = $created_at
+        ON MATCH SET 
+            r.amount = $amount,
+            r.updated_at = $updated_at
         RETURN r
         """
         
+        now = datetime.now(timezone.utc).isoformat()
         params = {
             "usdot": usdot,
             "provider_name": provider_name,
             "amount": amount,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": now,
+            "updated_at": now
         }
         
         result = self.execute_query(query, params)
