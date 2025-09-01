@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 from database import BaseRepository
 from models.carrier import Carrier
@@ -551,3 +551,195 @@ class CarrierRepository(BaseRepository):
         
         result = self.execute_query(query)
         return [record['chameleon_pattern'] for record in result]
+    
+    def get_carriers_without_insurance_on_date(self, check_date: date) -> List[Dict]:
+        """Find carriers without active insurance on a specific date.
+        
+        Args:
+            check_date: The date to check for insurance coverage
+            
+        Returns:
+            list: Carriers without insurance on the specified date
+        """
+        query = """
+        MATCH (c:Carrier)
+        WHERE NOT EXISTS {
+            MATCH (c)-[r:HAD_INSURANCE]->(:InsurancePolicy)
+            WHERE date($check_date) >= date(r.from_date)
+            AND (r.to_date IS NULL OR date($check_date) <= date(r.to_date))
+        }
+        RETURN {
+            carrier_usdot: c.usdot,
+            carrier_name: c.carrier_name,
+            last_known_provider: c.insurance_provider,
+            trucks: c.trucks,
+            violations: c.violations,
+            crashes: c.crashes
+        } as uninsured_carrier
+        ORDER BY c.trucks DESC
+        """
+        
+        params = {"check_date": check_date.isoformat()}
+        result = self.execute_query(query, params)
+        return [record['uninsured_carrier'] for record in result]
+    
+    def get_coverage_timeline(self, carrier_usdot: int) -> List[Dict]:
+        """Get complete insurance coverage timeline for a carrier.
+        
+        Args:
+            carrier_usdot: The carrier's USDOT number
+            
+        Returns:
+            list: Chronological list of insurance policies with temporal data
+        """
+        query = """
+        MATCH (c:Carrier {usdot: $carrier_usdot})-[r:HAD_INSURANCE]->(ip:InsurancePolicy)
+        RETURN {
+            policy_id: ip.policy_id,
+            provider_name: ip.provider_name,
+            from_date: r.from_date,
+            to_date: r.to_date,
+            status: r.status,
+            duration_days: r.duration_days,
+            coverage_amount: ip.coverage_amount,
+            policy_type: ip.policy_type
+        } as coverage_period
+        ORDER BY r.from_date
+        """
+        
+        params = {"carrier_usdot": carrier_usdot}
+        result = self.execute_query(query, params)
+        return [record['coverage_period'] for record in result]
+    
+    def find_overlapping_policies(self) -> List[Dict]:
+        """Find carriers with overlapping insurance policies.
+        
+        Returns:
+            list: Carriers with overlapping coverage periods
+        """
+        query = """
+        MATCH (c:Carrier)-[r1:HAD_INSURANCE]->(ip1:InsurancePolicy)
+        MATCH (c)-[r2:HAD_INSURANCE]->(ip2:InsurancePolicy)
+        WHERE id(r1) < id(r2)
+          AND r1.from_date < r2.from_date
+          AND (r1.to_date IS NULL OR r1.to_date > r2.from_date)
+        RETURN {
+            carrier_usdot: c.usdot,
+            carrier_name: c.carrier_name,
+            policy1_id: ip1.policy_id,
+            policy1_provider: ip1.provider_name,
+            policy1_from: r1.from_date,
+            policy1_to: r1.to_date,
+            policy2_id: ip2.policy_id,
+            policy2_provider: ip2.provider_name,
+            policy2_from: r2.from_date,
+            policy2_to: r2.to_date,
+            overlap_days: CASE 
+                WHEN r1.to_date IS NULL THEN 
+                    duration.between(date(r2.from_date), date()).days
+                ELSE 
+                    duration.between(date(r2.from_date), date(r1.to_date)).days
+            END
+        } as overlap_info
+        ORDER BY overlap_info.overlap_days DESC
+        """
+        
+        result = self.execute_query(query)
+        return [record['overlap_info'] for record in result]
+    
+    def calculate_total_days_without_coverage(self, carrier_usdot: int, 
+                                             start_date: date, 
+                                             end_date: date) -> int:
+        """Calculate total days without insurance coverage in a date range.
+        
+        Args:
+            carrier_usdot: The carrier's USDOT number
+            start_date: Start of the period to check
+            end_date: End of the period to check
+            
+        Returns:
+            int: Total number of days without coverage
+        """
+        query = """
+        MATCH (c:Carrier {usdot: $carrier_usdot})-[r:HAD_INSURANCE]->(ip:InsurancePolicy)
+        WHERE r.from_date <= $end_date 
+          AND (r.to_date IS NULL OR r.to_date >= $start_date)
+        WITH c, 
+             COLLECT({
+                 from: CASE 
+                     WHEN r.from_date < $start_date THEN $start_date 
+                     ELSE r.from_date 
+                 END,
+                 to: CASE 
+                     WHEN r.to_date IS NULL OR r.to_date > $end_date THEN $end_date 
+                     ELSE r.to_date 
+                 END
+             }) as coverage_periods
+        
+        // Calculate total covered days
+        WITH c, coverage_periods,
+             duration.between(date($start_date), date($end_date)).days + 1 as total_days
+        UNWIND coverage_periods as period
+        WITH c, total_days, 
+             SUM(duration.between(date(period.from), date(period.to)).days + 1) as covered_days
+        
+        RETURN total_days - covered_days as days_without_coverage
+        """
+        
+        params = {
+            "carrier_usdot": carrier_usdot,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat()
+        }
+        
+        result = self.execute_query(query, params)
+        if result and result[0].get('days_without_coverage') is not None:
+            return result[0]['days_without_coverage']
+        return 0
+    
+    def find_carriers_with_coverage_gaps(self, gap_threshold_days: int = 30) -> List[Dict]:
+        """Find carriers with significant gaps in insurance coverage.
+        
+        Args:
+            gap_threshold_days: Minimum gap size to report (default 30 days)
+            
+        Returns:
+            list: Carriers with coverage gaps exceeding threshold
+        """
+        query = """
+        MATCH (c:Carrier)-[r1:HAD_INSURANCE]->(ip1:InsurancePolicy)
+        MATCH (c)-[r2:HAD_INSURANCE]->(ip2:InsurancePolicy)
+        WHERE r1.to_date IS NOT NULL 
+          AND r2.from_date > r1.to_date
+          AND id(r1) < id(r2)
+        WITH c, r1, r2, ip1, ip2,
+             duration.between(date(r1.to_date), date(r2.from_date)).days as gap_days
+        WHERE gap_days >= $gap_threshold_days
+        WITH c, 
+             COLLECT({
+                 from_policy: ip1.policy_id,
+                 to_policy: ip2.policy_id,
+                 gap_start: r1.to_date,
+                 gap_end: r2.from_date,
+                 gap_days: gap_days,
+                 from_provider: ip1.provider_name,
+                 to_provider: ip2.provider_name
+             }) as gaps,
+             MAX(gap_days) as max_gap,
+             SUM(gap_days) as total_gap_days
+        RETURN {
+            carrier_usdot: c.usdot,
+            carrier_name: c.carrier_name,
+            gap_count: SIZE(gaps),
+            max_gap_days: max_gap,
+            total_gap_days: total_gap_days,
+            gaps: gaps,
+            violations: c.violations,
+            crashes: c.crashes
+        } as gap_info
+        ORDER BY total_gap_days DESC
+        """
+        
+        params = {"gap_threshold_days": gap_threshold_days}
+        result = self.execute_query(query, params)
+        return [record['gap_info'] for record in result]

@@ -132,6 +132,17 @@ class InsurancePolicyRepository(BaseRepository):
         Returns:
             bool: True if relationship created, False otherwise
         """
+        # Calculate status
+        status = "ACTIVE"
+        if to_date:
+            if to_date < date.today():
+                status = "EXPIRED"
+        
+        # Calculate duration days
+        duration_days = -1  # Active policy
+        if to_date:
+            duration_days = (to_date - from_date).days
+        
         query = """
         MATCH (c:Carrier {usdot: $carrier_usdot})
         MATCH (ip:InsurancePolicy {policy_id: $policy_id})
@@ -139,9 +150,13 @@ class InsurancePolicyRepository(BaseRepository):
         ON CREATE SET 
             r.from_date = $from_date,
             r.to_date = $to_date,
+            r.status = $status,
+            r.duration_days = $duration_days,
             r.created_at = $created_at
         ON MATCH SET 
             r.to_date = $to_date,
+            r.status = $status,
+            r.duration_days = $duration_days,
             r.updated_at = $updated_at
         RETURN r
         """
@@ -152,6 +167,8 @@ class InsurancePolicyRepository(BaseRepository):
             "policy_id": policy_id,
             "from_date": from_date.isoformat(),
             "to_date": to_date.isoformat() if to_date else None,
+            "status": status,
+            "duration_days": duration_days,
             "created_at": now,
             "updated_at": now
         }

@@ -326,12 +326,19 @@ class SearchCarriersInsuranceEnrichment:
                     self.policy_repo.create(policy)
                     result["policies_created"] += 1
                     
-                    # Create relationships
+                    # Create relationships with proper temporal data
+                    # Determine the end date and check if it's a cancelled policy
+                    end_date = None
+                    if policy.cancellation_date:
+                        end_date = policy.cancellation_date
+                    elif policy.expiration_date:
+                        end_date = policy.expiration_date
+                    
                     self.policy_repo.create_carrier_relationship(
                         policy.policy_id,
                         carrier_usdot,
                         policy.effective_date,
-                        policy.cancellation_date or policy.expiration_date
+                        end_date
                     )
                     
                     self.policy_repo.create_provider_relationship(
