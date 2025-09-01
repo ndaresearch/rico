@@ -82,13 +82,13 @@ Environment variables (see `.env.example`):
 
 ```bash
 # Import JB Hunt carriers
-python scripts/import/jb_hunt_carriers_import.py
+python scripts/ingest/jb_hunt_carriers_import.py
 
 # Create officers from carriers
-python scripts/import/create_officers_from_carriers.py
+python scripts/ingest/create_officers_from_carriers.py
 
 # Fix insurance relationships
-python scripts/import/fix_insurance_relationships.py
+python scripts/ingest/fix_insurance_relationships.py
 ```
 
 ## Project Structure

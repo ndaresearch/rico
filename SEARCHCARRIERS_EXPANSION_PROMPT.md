@@ -127,7 +127,7 @@ Design specific Neo4j Cypher queries that would leverage the new data to detect:
 
 - **SearchCarriers API Key**: Available as environment variable
 - **Current Tech Stack**: Python, FastAPI, Neo4j, Pydantic
-- **Existing Import Scripts**: Located in `/api/scripts/import/`
+- **Existing Import Scripts**: Located in `/api/scripts/ingest/`
 - **Test Data**: JB Hunt carriers CSV in `/api/csv/real_data/`
 
 ## Success Criteria
@@ -151,7 +151,7 @@ cat api/models/carrier.py
 cat api/models/insurance_provider.py
 
 # Examine existing import scripts for patterns
-ls -la api/scripts/import/
+ls -la api/scripts/ingest/
 
 # Check current carrier data
 cat api/csv/real_data/jb_hunt_carriers.csv | head -20

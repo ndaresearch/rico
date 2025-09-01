@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Test the JB Hunt import script parsing"""
 
-from scripts.import.jb_hunt_carriers_import import load_jb_hunt_carriers
+from scripts.ingest.jb_hunt_carriers_import import load_jb_hunt_carriers
 
 carriers, providers = load_jb_hunt_carriers('csv/real_data/jb_hunt_carriers.csv')
 print(f'Loaded {len(carriers)} carriers')

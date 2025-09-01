@@ -77,10 +77,10 @@ RICO is a fraud detection system for the trucking industry using Neo4j graph dat
 ## Import Scripts
 ```bash
 # Import JB Hunt carriers with all relationships
-python api/scripts/import/jb_hunt_carriers_import.py
+python api/scripts/ingest/jb_hunt_carriers_import.py
 
 # Fix missing insurance relationships (idempotent)
-python api/scripts/import/fix_insurance_relationships.py
+python api/scripts/ingest/fix_insurance_relationships.py
 ```
 
 ## Key Design Decisions

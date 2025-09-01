@@ -14,7 +14,7 @@ from models.insurance_event import InsuranceEvent
 from repositories.insurance_policy_repository import InsurancePolicyRepository
 from repositories.carrier_repository import CarrierRepository
 from services.searchcarriers_client import SearchCarriersClient
-from scripts.import.searchcarriers_insurance_enrichment import SearchCarriersInsuranceEnrichment
+from scripts.ingest.searchcarriers_insurance_enrichment import SearchCarriersInsuranceEnrichment
 
 router = APIRouter(prefix="/insurance", tags=["Insurance"])
 
@@ -260,8 +260,8 @@ async def check_carrier_compliance(carrier_usdot: int):
 
 @router.post("/bulk-enrich/high-risk", response_model=dict)
 async def bulk_enrich_high_risk_carriers(
-    limit: int = Query(10, description="Maximum number of carriers to process"),
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    limit: int = Query(10, description="Maximum number of carriers to process")
 ):
     """Enrich high-risk carriers (violations > 20 or crashes > 5) with insurance data.
     

@@ -11,7 +11,7 @@ Implement comprehensive insurance data collection and fraud detection by integra
 - **API**: FastAPI with Python
 - **Existing Entities**: Carrier, InsuranceProvider, TargetCompany, Person
 - **Existing Relationships**: CONTRACTS_WITH, INSURED_BY, MANAGED_BY, HAS_EXECUTIVE
-- **Import Pattern**: Scripts in `/api/scripts/import/` using Pydantic models
+- **Import Pattern**: Scripts in `/api/scripts/ingest/` using Pydantic models
 
 ## Phase 1 Implementation Tasks
 
@@ -86,7 +86,7 @@ Create `/api/services/searchcarriers_client.py` following the existing service p
    ```
 
 ### Task 4: Create Import/Enrichment Script
-Following patterns in `/api/scripts/import/`, create `searchcarriers_insurance_enrichment.py`:
+Following patterns in `/api/scripts/ingest/`, create `searchcarriers_insurance_enrichment.py`:
 
 1. **Batch Processing Logic**:
    - Start with highest-risk carriers (violations > 20 or crashes > 5)
@@ -215,8 +215,8 @@ NEO4J_PASSWORD=your_password
 - `/docs/searchcarriers/03_insurance_endpoints.md` - Insurance API details
 - `/api/models/carrier.py` - Example model structure
 - `/api/repositories/carrier_repository.py` - Repository pattern
-- `/api/scripts/import/jb_hunt_carriers_import.py` - Import script pattern
-- `/api/scripts/import/fix_insurance_relationships.py` - Relationship creation pattern
+- `/api/scripts/ingest/jb_hunt_carriers_import.py` - Import script pattern
+- `/api/scripts/ingest/fix_insurance_relationships.py` - Relationship creation pattern
 
 ## Expected Deliverables
 1. `InsurancePolicy` and `InsuranceEvent` Pydantic models
