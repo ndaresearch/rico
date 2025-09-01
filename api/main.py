@@ -13,6 +13,7 @@ from routes.person_routes import router as person_router
 from routes.target_company_routes import router as target_company_router
 from routes.carrier_routes import router as carrier_router
 from routes.insurance_provider_routes import router as insurance_provider_router
+from routes.insurance_routes import router as insurance_router
 
 # Configure logging based on settings
 logging.basicConfig(
@@ -89,6 +90,10 @@ tags_metadata = [
     {
         "name": "persons",
         "description": "Manage person entities - officers, executives, and other individuals in the trucking network",
+    },
+    {
+        "name": "Insurance",
+        "description": "Insurance policy management, fraud detection, and SearchCarriers API enrichment",
     },
 ]
 
@@ -183,6 +188,11 @@ app.include_router(
 
 app.include_router(
     insurance_provider_router,
+    dependencies=[Depends(verify_api_key)]
+)
+
+app.include_router(
+    insurance_router,
     dependencies=[Depends(verify_api_key)]
 )
 

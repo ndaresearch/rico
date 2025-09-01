@@ -359,3 +359,195 @@ class CarrierRepository(BaseRepository):
         
         result = self.execute_query(query, {"carriers": carriers_data})
         return {"created": result[0]['created']} if result else {"created": 0}
+    
+    def detect_insurance_gaps(self, min_gap_days: int = 30) -> List[Dict]:
+        """Detect carriers with insurance coverage gaps.
+        
+        Args:
+            min_gap_days: Minimum gap size in days to report (default 30)
+            
+        Returns:
+            list: Carriers with coverage gaps and details
+        """
+        query = """
+        MATCH (c:Carrier)-[:HAD_INSURANCE]->(ip1:InsurancePolicy)
+        OPTIONAL MATCH (ip1)<-[:PRECEDED_BY {gap_days: gap}]-(ip2:InsurancePolicy)
+        WHERE gap >= $min_gap_days
+        WITH c, ip1, ip2, gap
+        RETURN {
+            carrier_usdot: c.usdot,
+            carrier_name: c.carrier_name,
+            gap_days: gap,
+            from_policy: ip1.policy_id,
+            to_policy: ip2.policy_id,
+            from_provider: ip1.provider_name,
+            to_provider: ip2.provider_name,
+            violation_count: c.violations,
+            crash_count: c.crashes
+        } as gap_info
+        ORDER BY gap DESC
+        """
+        
+        result = self.execute_query(query, {"min_gap_days": min_gap_days})
+        return [record['gap_info'] for record in result]
+    
+    def detect_insurance_shopping_patterns(self, months: int = 12, min_providers: int = 3) -> List[Dict]:
+        """Detect carriers with frequent insurance provider changes.
+        
+        Args:
+            months: Time window in months
+            min_providers: Minimum number of providers to flag as shopping
+            
+        Returns:
+            list: Carriers showing insurance shopping behavior
+        """
+        query = """
+        MATCH (c:Carrier)-[:HAD_INSURANCE]->(ip:InsurancePolicy)
+        WHERE ip.effective_date >= date() - duration({months: $months})
+        WITH c, COUNT(DISTINCT ip.provider_name) as provider_count,
+             COLLECT(DISTINCT ip.provider_name) as providers,
+             COLLECT(DISTINCT ip.effective_date) as dates
+        WHERE provider_count >= $min_providers
+        RETURN {
+            carrier_usdot: c.usdot,
+            carrier_name: c.carrier_name,
+            provider_count: provider_count,
+            providers: providers,
+            policy_dates: dates,
+            violations: c.violations,
+            crashes: c.crashes,
+            risk_score: toFloat(provider_count) / toFloat($months)
+        } as shopping_info
+        ORDER BY provider_count DESC
+        """
+        
+        params = {
+            "months": months,
+            "min_providers": min_providers
+        }
+        
+        result = self.execute_query(query, params)
+        return [record['shopping_info'] for record in result]
+    
+    def find_underinsured_operations(self, cargo_type: str = "GENERAL_FREIGHT") -> List[Dict]:
+        """Find carriers operating with insurance below federal minimums.
+        
+        Args:
+            cargo_type: Type of cargo for determining minimum requirements
+            
+        Returns:
+            list: Underinsured carriers with coverage details
+        """
+        # Federal minimums per 49 CFR § 387.7
+        federal_minimums = {
+            "GENERAL_FREIGHT": 750000.0,
+            "HOUSEHOLD_GOODS": 750000.0,
+            "HAZMAT": 5000000.0,
+            "PASSENGERS_15_PLUS": 5000000.0,
+            "PASSENGERS_UNDER_15": 1500000.0
+        }
+        
+        min_coverage = federal_minimums.get(cargo_type, 750000.0)
+        
+        query = """
+        MATCH (c:Carrier)-[:HAD_INSURANCE]->(ip:InsurancePolicy)
+        WHERE ip.filing_status = 'ACTIVE'
+          AND ip.coverage_amount < $min_coverage
+        RETURN {
+            carrier_usdot: c.usdot,
+            carrier_name: c.carrier_name,
+            current_coverage: ip.coverage_amount,
+            required_minimum: $min_coverage,
+            shortage: $min_coverage - ip.coverage_amount,
+            provider: ip.provider_name,
+            policy_id: ip.policy_id,
+            violations: c.violations,
+            crashes: c.crashes
+        } as underinsured_info
+        ORDER BY underinsured_info.shortage DESC
+        """
+        
+        result = self.execute_query(query, {"min_coverage": min_coverage})
+        return [record['underinsured_info'] for record in result]
+    
+    def get_insurance_fraud_risk_scores(self) -> List[Dict]:
+        """Calculate comprehensive fraud risk scores for all carriers based on insurance patterns.
+        
+        Returns:
+            list: Carriers with calculated risk scores and contributing factors
+        """
+        query = """
+        MATCH (c:Carrier)
+        OPTIONAL MATCH (c)-[:HAD_INSURANCE]->(ip:InsurancePolicy)
+        OPTIONAL MATCH (c)-[:INSURANCE_EVENT]->(ie:InsuranceEvent)
+        WITH c,
+             COUNT(DISTINCT ip) as policy_count,
+             COUNT(DISTINCT ip.provider_name) as provider_count,
+             COUNT(DISTINCT CASE WHEN ie.event_type = 'CANCELLATION' THEN ie END) as cancellations,
+             COUNT(DISTINCT CASE WHEN ie.compliance_violation = true THEN ie END) as violations,
+             MAX(CASE WHEN EXISTS((ip)<-[:PRECEDED_BY {gap_days: gap}]-()) THEN gap ELSE 0 END) as max_gap
+        WITH c, 
+             policy_count,
+             provider_count,
+             cancellations,
+             violations,
+             max_gap,
+             // Calculate risk score (0-100)
+             CASE
+                WHEN policy_count = 0 THEN 100  // No insurance is highest risk
+                ELSE (
+                    (CASE WHEN provider_count > 3 THEN 25 ELSE 0 END) +  // Shopping
+                    (CASE WHEN cancellations > 2 THEN 25 ELSE cancellations * 10 END) +  // Cancellations
+                    (CASE WHEN violations > 0 THEN 25 ELSE 0 END) +  // Compliance violations
+                    (CASE WHEN max_gap > 30 THEN 25 WHEN max_gap > 7 THEN 15 ELSE 0 END)  // Gaps
+                )
+             END as risk_score
+        WHERE risk_score > 0
+        RETURN {
+            carrier_usdot: c.usdot,
+            carrier_name: c.carrier_name,
+            risk_score: risk_score,
+            policy_count: policy_count,
+            provider_count: provider_count,
+            cancellations: cancellations,
+            compliance_violations: violations,
+            max_coverage_gap: max_gap,
+            safety_violations: c.violations,
+            crashes: c.crashes
+        } as risk_info
+        ORDER BY risk_score DESC
+        """
+        
+        result = self.execute_query(query)
+        return [record['risk_info'] for record in result]
+    
+    def find_chameleon_carrier_patterns(self) -> List[Dict]:
+        """Detect potential chameleon carriers based on insurance and authority patterns.
+        
+        Returns:
+            list: Potential chameleon carriers with suspicious patterns
+        """
+        query = """
+        // Find carriers with similar officers and insurance patterns
+        MATCH (c1:Carrier)-[:MANAGED_BY]->(p:Person)<-[:MANAGED_BY]-(c2:Carrier)
+        WHERE c1.usdot <> c2.usdot
+        OPTIONAL MATCH (c1)-[:HAD_INSURANCE]->(ip1:InsurancePolicy)
+        OPTIONAL MATCH (c2)-[:HAD_INSURANCE]->(ip2:InsurancePolicy)
+        WHERE ip1.provider_name = ip2.provider_name
+        WITH c1, c2, p, COUNT(DISTINCT ip1.provider_name) as shared_providers
+        WHERE shared_providers > 0
+        RETURN {
+            carrier1_usdot: c1.usdot,
+            carrier1_name: c1.carrier_name,
+            carrier2_usdot: c2.usdot,
+            carrier2_name: c2.carrier_name,
+            shared_officer: p.name,
+            shared_insurance_providers: shared_providers,
+            carrier1_violations: c1.violations,
+            carrier2_violations: c2.violations
+        } as chameleon_pattern
+        ORDER BY shared_providers DESC
+        """
+        
+        result = self.execute_query(query)
+        return [record['chameleon_pattern'] for record in result]
