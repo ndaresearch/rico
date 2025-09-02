@@ -261,6 +261,41 @@ class SearchCarriersInsuranceEnrichment:
         
         return events
     
+    def enrich_carrier_by_usdot(self, carrier_usdot: int) -> Dict:
+        """Enrich a carrier by USDOT number with insurance data from SearchCarriers.
+        
+        Args:
+            carrier_usdot: USDOT number of the carrier
+            
+        Returns:
+            dict: Enrichment results
+        """
+        logger.info(f"Enriching carrier by USDOT: {carrier_usdot}")
+        
+        # Fetch carrier data from database
+        try:
+            carrier = self.carrier_repo.get_by_usdot(carrier_usdot)
+            if not carrier:
+                logger.warning(f"Carrier with USDOT {carrier_usdot} not found in database")
+                return {
+                    "carrier_usdot": carrier_usdot,
+                    "error": "Carrier not found in database",
+                    "policies_created": 0,
+                    "events_created": 0
+                }
+            
+            # Use existing enrich_carrier method
+            return self.enrich_carrier(carrier)
+            
+        except Exception as e:
+            logger.error(f"Error fetching carrier {carrier_usdot} from database: {e}")
+            return {
+                "carrier_usdot": carrier_usdot,
+                "error": str(e),
+                "policies_created": 0,
+                "events_created": 0
+            }
+    
     def enrich_carrier(self, carrier: Dict) -> Dict:
         """Enrich a single carrier with insurance data from SearchCarriers.
         

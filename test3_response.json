@@ -1,0 +1,18 @@
+{
+  "job_id": "bc3f405d-4adf-47c5-a35a-7e8efba48489",
+  "status": "completed",
+  "execution_time_seconds": 0.586888,
+  "summary": {
+    "total_records": 67,
+    "carriers_created": 0,
+    "carriers_skipped": 67,
+    "carriers_updated": 0,
+    "insurance_providers_created": 0,
+    "persons_created": 0,
+    "relationships_created": 200,
+    "validation_errors": 0,
+    "errors": []
+  },
+  "errors": [],
+  "invalid_records": []
+}

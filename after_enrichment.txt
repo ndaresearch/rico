@@ -1,0 +1,5 @@
+type, count
+"Person", 67
+"Carrier", 67
+"InsuranceProvider", 26
+"TargetCompany", 1

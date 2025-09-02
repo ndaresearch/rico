@@ -31,6 +31,12 @@ class Settings(BaseSettings):
         description="API key for authentication. If not set, authentication is disabled (dev mode)"
     )
     
+    # External API Configuration
+    search_carriers_api_token: Optional[str] = Field(
+        default=None,
+        description="SearchCarriers API token for insurance enrichment"
+    )
+    
     # Application Settings
     app_name: str = Field(
         default="RICO Graph API",
