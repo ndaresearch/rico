@@ -21,9 +21,16 @@ from dotenv import load_dotenv
 from models.insurance_policy import InsurancePolicy
 from models.insurance_event import InsuranceEvent
 from models.carrier import Carrier
+from models.safety_snapshot import SafetySnapshot
+from models.crash import Crash
+from models.inspection import Inspection
+from models.violation import Violation
 from repositories.carrier_repository import CarrierRepository
 from repositories.insurance_policy_repository import InsurancePolicyRepository
 from repositories.insurance_provider_repository import InsuranceProviderRepository
+from repositories.safety_snapshot_repository import SafetySnapshotRepository
+from repositories.crash_repository import CrashRepository
+from repositories.inspection_repository import InspectionRepository
 from services.searchcarriers_client import SearchCarriersClient
 
 # Load environment variables
@@ -45,6 +52,9 @@ class SearchCarriersInsuranceEnrichment:
         self.carrier_repo = CarrierRepository()
         self.policy_repo = InsurancePolicyRepository()
         self.provider_repo = InsuranceProviderRepository()
+        self.safety_repo = SafetySnapshotRepository()
+        self.crash_repo = CrashRepository()
+        self.inspection_repo = InspectionRepository()
         self.client = SearchCarriersClient()
         
         # Track statistics
@@ -432,6 +442,359 @@ class SearchCarriersInsuranceEnrichment:
             self.stats["errors"] += 1
         
         return result
+    
+    def enrich_carrier_safety_data(self, usdot: int) -> Dict:
+        """Enrich a carrier with safety snapshot data from SearchCarriers.
+        
+        Args:
+            usdot: USDOT number of the carrier
+            
+        Returns:
+            dict: Enrichment results with snapshot creation status
+        """
+        logger.info(f"Fetching safety data for carrier {usdot}")
+        
+        try:
+            result = self.client.get_safety_summary(usdot)
+            
+            if "error" in result:
+                logger.warning(f"No safety data found for {usdot}: {result.get('error')}")
+                return {"error": result["error"]}
+            
+            if not result.get("data"):
+                logger.warning(f"No safety data found for {usdot}")
+                return {"error": "No safety data available"}
+            
+            safety_data = result["data"]
+            
+            # Parse OOS rates and SMS scores from the response
+            driver_oos_rate = float(safety_data.get("driver_oos_rate", 0.0))
+            vehicle_oos_rate = float(safety_data.get("vehicle_oos_rate", 0.0))
+            
+            # Create SafetySnapshot instance
+            snapshot = SafetySnapshot(
+                usdot=usdot,
+                snapshot_date=datetime.now(timezone.utc).date(),
+                driver_oos_rate=driver_oos_rate,
+                vehicle_oos_rate=vehicle_oos_rate,
+                driver_oos_national_avg=5.0,
+                vehicle_oos_national_avg=20.0,
+                unsafe_driving_score=safety_data.get("unsafe_driving_score"),
+                hours_of_service_score=safety_data.get("hours_of_service_score"),
+                driver_fitness_score=safety_data.get("driver_fitness_score"),
+                controlled_substances_score=safety_data.get("controlled_substances_score"),
+                vehicle_maintenance_score=safety_data.get("vehicle_maintenance_score"),
+                hazmat_compliance_score=safety_data.get("hazmat_compliance_score"),
+                crash_indicator_score=safety_data.get("crash_indicator_score"),
+                unsafe_driving_alert=safety_data.get("unsafe_driving_alert", False),
+                hours_of_service_alert=safety_data.get("hours_of_service_alert", False),
+                driver_fitness_alert=safety_data.get("driver_fitness_alert", False),
+                controlled_substances_alert=safety_data.get("controlled_substances_alert", False),
+                vehicle_maintenance_alert=safety_data.get("vehicle_maintenance_alert", False),
+                hazmat_compliance_alert=safety_data.get("hazmat_compliance_alert", False),
+                crash_indicator_alert=safety_data.get("crash_indicator_alert", False),
+                last_update=datetime.now(timezone.utc)
+            )
+            
+            # Save to Neo4j
+            created_snapshot = self.safety_repo.create(snapshot)
+            
+            if created_snapshot:
+                # Create relationship to carrier
+                self.safety_repo.create_relationship_to_carrier(usdot, snapshot)
+                
+                # Check for high-risk indicators
+                if driver_oos_rate > 10.0:  # 2x national average
+                    logger.warning(f"High driver OOS rate detected for {usdot}: {driver_oos_rate}%")
+                
+                if vehicle_oos_rate > 40.0:  # 2x national average
+                    logger.warning(f"High vehicle OOS rate detected for {usdot}: {vehicle_oos_rate}%")
+                
+                logger.info(f"Created safety snapshot for carrier {usdot}")
+                
+                return {
+                    "snapshot_created": True,
+                    "driver_oos_rate": driver_oos_rate,
+                    "vehicle_oos_rate": vehicle_oos_rate
+                }
+            else:
+                return {
+                    "snapshot_created": False,
+                    "error": "Failed to create safety snapshot"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error fetching safety data for {usdot}: {e}")
+            return {"error": str(e)}
+    
+    def enrich_carrier_crash_data(self, usdot: int) -> Dict:
+        """Enrich a carrier with crash history data from SearchCarriers.
+        
+        Args:
+            usdot: USDOT number of the carrier
+            
+        Returns:
+            dict: Enrichment results with crash statistics
+        """
+        logger.info(f"Fetching crash data for carrier {usdot}")
+        
+        try:
+            result = self.client.get_crashes(usdot)
+            
+            if "error" in result:
+                logger.warning(f"No crash data found for {usdot}: {result.get('error')}")
+                return {"error": result["error"]}
+            
+            if not result.get("data"):
+                logger.info(f"No crashes found for carrier {usdot}")
+                return {
+                    "crash_count": 0,
+                    "fatal_crashes": 0,
+                    "injury_crashes": 0
+                }
+            
+            crashes = result["data"]
+            crash_count = 0
+            fatal_crashes = 0
+            injury_crashes = 0
+            
+            for crash_data in crashes:
+                try:
+                    # Parse crash date
+                    crash_date = None
+                    if crash_data.get("crash_date"):
+                        try:
+                            crash_date = datetime.strptime(crash_data["crash_date"], "%Y-%m-%d %H:%M:%S")
+                        except ValueError:
+                            crash_date = datetime.fromisoformat(crash_data["crash_date"])
+                    
+                    # Create Crash instance
+                    crash = Crash(
+                        report_number=crash_data.get("report_number", f"CR-{usdot}-{crash_count}"),
+                        report_state=crash_data.get("report_state"),
+                        usdot=usdot,
+                        crash_date=crash_date or datetime.now(timezone.utc),
+                        severity=crash_data.get("severity"),
+                        tow_away=crash_data.get("tow_away", False),
+                        fatalities=crash_data.get("fatalities", 0),
+                        injuries=crash_data.get("injuries", 0),
+                        vehicles_involved=crash_data.get("vehicles_involved"),
+                        weather=crash_data.get("weather"),
+                        road_condition=crash_data.get("road_condition"),
+                        light_condition=crash_data.get("light_condition"),
+                        latitude=crash_data.get("latitude"),
+                        longitude=crash_data.get("longitude"),
+                        preventable=crash_data.get("preventable"),
+                        citation_issued=crash_data.get("citation_issued")
+                    )
+                    
+                    # Save to Neo4j
+                    created_crash = self.crash_repo.create(crash)
+                    
+                    if created_crash:
+                        # Create relationship to carrier
+                        self.crash_repo.create_relationship_to_carrier(usdot, crash)
+                        crash_count += 1
+                        
+                        # Count fatalities and injuries
+                        if crash.fatalities and crash.fatalities > 0:
+                            fatal_crashes += 1
+                            logger.warning(f"Fatal crash detected for carrier {usdot}: {crash.fatalities} fatalities")
+                        
+                        if crash.injuries and crash.injuries > 0:
+                            injury_crashes += 1
+                
+                except Exception as e:
+                    logger.error(f"Error processing crash for carrier {usdot}: {e}")
+                    continue
+            
+            # Handle pagination if needed (more than 100 crashes)
+            if len(crashes) == 100:
+                # Fetch additional pages
+                page = 2
+                while True:
+                    additional_result = self.client.get_crashes(usdot, page=page)
+                    if not additional_result.get("data"):
+                        break
+                    
+                    for crash_data in additional_result["data"]:
+                        # Process additional crashes (same logic as above)
+                        crash_count += 1
+                    
+                    if len(additional_result["data"]) < 100:
+                        break
+                    page += 1
+            
+            logger.info(f"Created {crash_count} crash records for carrier {usdot}")
+            
+            return {
+                "crash_count": crash_count,
+                "fatal_crashes": fatal_crashes,
+                "injury_crashes": injury_crashes
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching crash data for {usdot}: {e}")
+            return {"error": str(e)}
+    
+    def enrich_carrier_inspection_data(self, usdot: int) -> Dict:
+        """Enrich a carrier with inspection and violation data from SearchCarriers.
+        
+        Args:
+            usdot: USDOT number of the carrier
+            
+        Returns:
+            dict: Enrichment results with inspection statistics
+        """
+        logger.info(f"Fetching inspection data for carrier {usdot}")
+        
+        try:
+            result = self.client.get_inspections(usdot, since_months=24)
+            
+            if "error" in result:
+                logger.warning(f"No inspection data found for {usdot}: {result.get('error')}")
+                return {"error": result["error"]}
+            
+            if not result.get("data"):
+                logger.info(f"No inspections found for carrier {usdot}")
+                return {
+                    "inspection_count": 0,
+                    "violation_count": 0,
+                    "oos_inspections": 0
+                }
+            
+            inspections = result["data"]
+            inspection_count = 0
+            violation_count = 0
+            oos_inspections = 0
+            
+            for inspection_data in inspections:
+                try:
+                    # Parse inspection date
+                    inspection_date = None
+                    if inspection_data.get("inspection_date"):
+                        try:
+                            inspection_date = datetime.strptime(inspection_data["inspection_date"], "%Y-%m-%d").date()
+                        except ValueError:
+                            inspection_date = datetime.fromisoformat(inspection_data["inspection_date"]).date()
+                    
+                    # Create Inspection instance
+                    inspection = Inspection(
+                        inspection_id=inspection_data.get("inspection_id", f"INSP-{usdot}-{inspection_count}"),
+                        usdot=usdot,
+                        inspection_date=inspection_date or date.today(),
+                        level=inspection_data.get("level", 0),
+                        state=inspection_data.get("state", ""),
+                        location=inspection_data.get("location"),
+                        violations_count=inspection_data.get("violations_count", 0),
+                        oos_violations_count=inspection_data.get("oos_violations_count", 0),
+                        vehicle_oos=inspection_data.get("vehicle_oos", False),
+                        driver_oos=inspection_data.get("driver_oos", False),
+                        hazmat_oos=inspection_data.get("hazmat_oos", False),
+                        result=inspection_data.get("result", "PASS")
+                    )
+                    
+                    # Save to Neo4j
+                    created_inspection = self.inspection_repo.create(inspection)
+                    
+                    if created_inspection:
+                        # Create relationship to carrier
+                        self.inspection_repo.create_relationship_to_carrier(usdot, inspection)
+                        inspection_count += 1
+                        
+                        # Count OOS inspections
+                        if inspection.driver_oos or inspection.vehicle_oos:
+                            oos_inspections += 1
+                        
+                        # Process violations if present
+                        violations = inspection_data.get("violations", [])
+                        if violations:
+                            violation_ids = []
+                            for violation_data in violations:
+                                try:
+                                    # Create Violation instance
+                                    violation = Violation(
+                                        violation_id=violation_data.get("violation_id", f"VIOL-{inspection.inspection_id}-{violation_count}"),
+                                        inspection_id=inspection.inspection_id,
+                                        code=violation_data.get("code"),
+                                        description=violation_data.get("description"),
+                                        category=violation_data.get("category"),
+                                        severity_weight=violation_data.get("severity_weight"),
+                                        oos_indicator=violation_data.get("oos_indicator"),
+                                        violation_date=inspection.inspection_date,
+                                        inspection_state=inspection.state,
+                                        inspection_level=inspection.level
+                                    )
+                                    
+                                    # Create violation node directly with Cypher (no ViolationRepository)
+                                    violation_query = """
+                                    CREATE (v:Violation {
+                                        violation_id: $violation_id,
+                                        inspection_id: $inspection_id,
+                                        code: $code,
+                                        description: $description,
+                                        category: $category,
+                                        severity_weight: $severity_weight,
+                                        oos_indicator: $oos_indicator,
+                                        violation_date: $violation_date,
+                                        inspection_state: $inspection_state,
+                                        inspection_level: $inspection_level
+                                    })
+                                    RETURN v
+                                    """
+                                    
+                                    violation_params = violation.model_dump()
+                                    if violation_params.get('violation_date'):
+                                        violation_params['violation_date'] = violation_params['violation_date'].isoformat()
+                                    
+                                    # Execute query using inspection repo's connection
+                                    violation_result = self.inspection_repo.execute_query(violation_query, violation_params)
+                                    
+                                    if violation_result:
+                                        violation_ids.append(violation.violation_id)
+                                        violation_count += 1
+                                
+                                except Exception as e:
+                                    logger.error(f"Error creating violation for inspection {inspection.inspection_id}: {e}")
+                                    continue
+                            
+                            # Link violations to inspection
+                            if violation_ids:
+                                self.inspection_repo.link_violations(inspection.inspection_id, violation_ids)
+                
+                except Exception as e:
+                    logger.error(f"Error processing inspection for carrier {usdot}: {e}")
+                    continue
+            
+            # Handle pagination if needed
+            if len(inspections) == 100:
+                page = 2
+                while True:
+                    additional_result = self.client.get_inspections(usdot, since_months=24, page=page)
+                    if not additional_result.get("data"):
+                        break
+                    
+                    # Process additional inspections (same logic as above)
+                    inspection_count += len(additional_result["data"])
+                    
+                    if len(additional_result["data"]) < 100:
+                        break
+                    page += 1
+            
+            logger.info(f"Created {inspection_count} inspection records with {violation_count} violations for carrier {usdot}")
+            
+            if oos_inspections > 0:
+                logger.warning(f"Carrier {usdot} has {oos_inspections} OOS inspections")
+            
+            return {
+                "inspection_count": inspection_count,
+                "violation_count": violation_count,
+                "oos_inspections": oos_inspections
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching inspection data for {usdot}: {e}")
+            return {"error": str(e)}
     
     def enrich_high_risk_carriers(self, limit: int = 10):
         """Enrich high-risk carriers first (those with violations > 20 or crashes > 5).
