@@ -4,14 +4,16 @@ Data Ingestion Routes for RICO API.
 Provides endpoints for bulk data import from CSV files with optional enrichment.
 """
 
+import base64
 import io
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from fastapi.responses import JSONResponse
 
+from models.ingest_request import IngestRequest, IngestResponse
 from services.ingest_orchestrator import IngestionOrchestrator
 
 logger = logging.getLogger(__name__)
@@ -30,11 +32,13 @@ router = APIRouter(
 
 @router.post(
     "/",
-    response_model=dict,
+    response_model=IngestResponse,
     status_code=status.HTTP_200_OK,
     summary="Ingest carrier data from CSV",
     description="""
     Ingest carrier data from a CSV file into the graph database.
+    
+    This endpoint accepts JSON with either base64-encoded CSV content or a server file path.
     
     This endpoint orchestrates the complete data import process:
     1. Parses and validates CSV data
@@ -44,6 +48,11 @@ router = APIRouter(
     
     The operation is atomic for entity creation but uses MERGE for relationships
     to ensure idempotency.
+    
+    ## Request Format
+    Provide either:
+    - `csv_content`: Base64-encoded CSV string
+    - `file_path`: Path to CSV file on server
     
     ## CSV Format
     Required columns:
@@ -70,85 +79,57 @@ router = APIRouter(
 )
 async def ingest_data(
     background_tasks: BackgroundTasks,
-    file: Optional[UploadFile] = File(None, description="CSV file to upload"),
-    file_path: Optional[str] = Query(None, description="Path to CSV file on server"),
-    target_company: str = Query("JB_HUNT", description="Target company identifier"),
-    enable_enrichment: bool = Query(False, description="Enable SearchCarriers API enrichment"),
-    skip_invalid: bool = Query(True, description="Skip invalid records instead of failing")
-):
+    request: IngestRequest
+) -> IngestResponse:
     """
     Ingest carrier data from CSV file.
     
     Args:
         background_tasks: FastAPI background tasks for async operations
-        file: Optional uploaded CSV file
-        file_path: Optional path to CSV file on server
-        target_company: Target company for relationship creation
-        enable_enrichment: Whether to queue SearchCarriers enrichment
-        skip_invalid: Whether to skip invalid records or fail on first error
+        request: JSON request with CSV content or file path
         
     Returns:
-        Dictionary with ingestion results including job ID, statistics, and any errors
+        IngestResponse with ingestion results including job ID, statistics, and any errors
         
     Raises:
         HTTPException: For various error conditions
     """
-    # Validate input - need either file or file_path
-    if not file and not file_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Either 'file' upload or 'file_path' parameter is required"
-        )
-    
-    if file and file_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Provide either 'file' upload or 'file_path', not both"
-        )
     
     # Prepare CSV content
     csv_content = None
     
     try:
-        if file:
-            # Validate file type
-            if not file.filename.endswith('.csv'):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid file type. Expected CSV, got: {file.filename}"
-                )
-            
-            # Read uploaded file
-            content = await file.read()
-            
-            # Check file size (limit to 10MB)
-            if len(content) > 10 * 1024 * 1024:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="File too large. Maximum size is 10MB"
-                )
-            
-            # Decode content
+        if request.csv_content:
+            # Decode base64 CSV content
             try:
-                csv_content = content.decode('utf-8')
-            except UnicodeDecodeError:
-                # Try with different encoding
-                try:
-                    csv_content = content.decode('latin-1')
-                except UnicodeDecodeError:
+                csv_content = request.get_csv_content()
+                if not csv_content:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Unable to decode CSV file. Please ensure it's in UTF-8 or Latin-1 encoding"
+                        detail="Failed to decode CSV content"
                     )
+                
+                # Check content size (limit to 10MB)
+                if len(csv_content.encode('utf-8')) > 10 * 1024 * 1024:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="CSV content too large. Maximum size is 10MB"
+                    )
+                
+                logger.info(f"Received base64 CSV content ({len(csv_content)} characters)")
+                
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(e)
+                )
             
-            logger.info(f"Received CSV upload: {file.filename} ({len(content)} bytes)")
-            
-        elif file_path:
+        elif request.file_path:
             # Validate and read file from path
-            path = Path(file_path)
+            path = Path(request.file_path)
             
             # Security check - prevent directory traversal
-            if ".." in file_path or file_path.startswith("/etc") or file_path.startswith("/sys"):
+            if ".." in request.file_path or request.file_path.startswith("/etc") or request.file_path.startswith("/sys"):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Access to this file path is not allowed"
@@ -157,13 +138,13 @@ async def ingest_data(
             if not path.exists():
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"File not found: {file_path}"
+                    detail=f"File not found: {request.file_path}"
                 )
             
             if not path.is_file():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Path is not a file: {file_path}"
+                    detail=f"Path is not a file: {request.file_path}"
                 )
             
             if not path.suffix.lower() == '.csv':
@@ -188,45 +169,45 @@ async def ingest_data(
                 with open(path, 'r', encoding='latin-1') as f:
                     csv_content = f.read()
             
-            logger.info(f"Reading CSV from path: {file_path}")
+            logger.info(f"Reading CSV from path: {request.file_path}")
         
         # Create orchestrator and process data
         orchestrator = IngestionOrchestrator()
         
         # Process ingestion
-        if enable_enrichment:
+        if request.enable_enrichment:
             # Run with enrichment in background
             async def ingest_with_enrichment():
                 return await orchestrator.ingest_data(
                     csv_content=csv_content,
-                    target_company=target_company,
+                    target_company=request.target_company,
                     enable_enrichment=True,
-                    skip_invalid=skip_invalid
+                    skip_invalid=request.skip_invalid
                 )
             
             # Add to background tasks
             background_tasks.add_task(ingest_with_enrichment)
             
             # Return immediate response
-            return {
-                "job_id": orchestrator.job_id,
-                "status": "processing",
-                "message": "Ingestion started. Data will be processed in the background.",
-                "enrichment": {
+            return IngestResponse(
+                job_id=orchestrator.job_id,
+                status="processing",
+                message="Ingestion started. Data will be processed in the background.",
+                enrichment={
                     "enabled": True,
                     "status": "queued"
                 }
-            }
+            )
         else:
             # Run synchronously without enrichment
             result = await orchestrator.ingest_data(
                 csv_content=csv_content,
-                target_company=target_company,
+                target_company=request.target_company,
                 enable_enrichment=False,
-                skip_invalid=skip_invalid
+                skip_invalid=request.skip_invalid
             )
             
-            return result
+            return IngestResponse(**result)
             
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -330,3 +311,86 @@ async def get_sample_csv():
     }
     
     return sample
+
+
+@router.get(
+    "/sample",
+    response_model=dict,
+    summary="Get sample JSON request",
+    description="Get sample JSON request format for the ingestion endpoint"
+)
+async def get_sample_request():
+    """
+    Get sample JSON request formats for the ingestion endpoint.
+    
+    Returns:
+        Dictionary with example requests for different scenarios
+    """
+    # Sample CSV for base64 encoding
+    sample_csv = """dot_number,JB Carrier,Carrier,Primary Officer, Insurance,Amount, Trucks
+1234567,Yes,Test Carrier LLC,John Doe,State National,$1 Million,25
+7654321,Yes,Another Carrier Inc,Jane Smith,Test Insurance,$750k,15"""
+    
+    # Encode to base64
+    encoded_csv = base64.b64encode(sample_csv.encode('utf-8')).decode('utf-8')
+    
+    return {
+        "description": "Sample JSON requests for the /ingest/ endpoint",
+        "examples": [
+            {
+                "name": "With base64 CSV content (no enrichment)",
+                "request": {
+                    "csv_content": encoded_csv,
+                    "target_company": "JB_HUNT",
+                    "enable_enrichment": False,
+                    "skip_invalid": True
+                },
+                "expected_response": {
+                    "job_id": "uuid-string",
+                    "status": "completed",
+                    "summary": {
+                        "total_records": 2,
+                        "carriers_created": 2,
+                        "insurance_providers_created": 2,
+                        "persons_created": 2,
+                        "relationships_created": 6
+                    }
+                }
+            },
+            {
+                "name": "With file path (with enrichment)",
+                "request": {
+                    "file_path": "api/csv/real_data/jb_hunt_carriers.csv",
+                    "target_company": "JB_HUNT",
+                    "enable_enrichment": True,
+                    "skip_invalid": True
+                },
+                "expected_response": {
+                    "job_id": "uuid-string",
+                    "status": "processing",
+                    "message": "Ingestion started. Data will be processed in the background.",
+                    "enrichment": {
+                        "enabled": True,
+                        "status": "queued"
+                    }
+                }
+            },
+            {
+                "name": "Minimal request",
+                "request": {
+                    "csv_content": encoded_csv
+                },
+                "note": "Uses default values: target_company='JB_HUNT', enable_enrichment=False, skip_invalid=True"
+            }
+        ],
+        "curl_examples": [
+            {
+                "description": "Test without enrichment",
+                "command": 'curl -X POST "http://localhost:8000/ingest/" -H "Content-Type: application/json" -H "X-API-Key: your-api-key" -d \'{"csv_content": "' + encoded_csv + '", "enable_enrichment": false}\''
+            },
+            {
+                "description": "Test with enrichment (returns immediately)",
+                "command": 'curl -X POST "http://localhost:8000/ingest/" -H "Content-Type: application/json" -H "X-API-Key: your-api-key" -d \'{"file_path": "api/csv/real_data/jb_hunt_carriers.csv", "enable_enrichment": true}\''
+            }
+        ]
+    }

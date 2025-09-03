@@ -2,7 +2,9 @@
 Tests for data ingestion endpoints and orchestration.
 """
 
+import base64
 import io
+import json
 import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
@@ -77,15 +79,18 @@ def cleanup():
             person_repo.delete(person["person_id"])
 
 
-def test_ingest_with_file_upload():
-    """Test ingesting data via file upload"""
-    # Create a file-like object from CSV string
-    csv_file = io.BytesIO(SAMPLE_CSV.encode('utf-8'))
+def test_ingest_with_base64_csv():
+    """Test ingesting data via base64-encoded CSV content"""
+    # Encode CSV to base64
+    encoded_csv = base64.b64encode(SAMPLE_CSV.encode('utf-8')).decode('utf-8')
     
     response = client.post(
         "/ingest/",
-        files={"file": ("test_carriers.csv", csv_file, "text/csv")},
-        params={"skip_invalid": True},
+        json={
+            "csv_content": encoded_csv,
+            "skip_invalid": True,
+            "enable_enrichment": False
+        },
         headers=headers
     )
     
@@ -126,7 +131,7 @@ def test_ingest_with_file_path():
     
     response = client.post(
         "/ingest/",
-        params={
+        json={
             "file_path": file_path,
             "skip_invalid": True,
             "enable_enrichment": False
@@ -142,53 +147,57 @@ def test_ingest_with_file_path():
 
 
 def test_ingest_missing_parameters():
-    """Test ingestion fails when neither file nor file_path provided"""
+    """Test ingestion fails when neither csv_content nor file_path provided"""
     response = client.post(
         "/ingest/",
+        json={},
         headers=headers
     )
     
-    assert response.status_code == 400
-    assert "Either 'file' upload or 'file_path' parameter is required" in response.json()["detail"]
+    assert response.status_code == 422  # Validation error from Pydantic
 
 
 def test_ingest_both_parameters():
-    """Test ingestion fails when both file and file_path provided"""
-    csv_file = io.BytesIO(SAMPLE_CSV.encode('utf-8'))
+    """Test ingestion fails when both csv_content and file_path provided"""
+    encoded_csv = base64.b64encode(SAMPLE_CSV.encode('utf-8')).decode('utf-8')
     
     response = client.post(
         "/ingest/",
-        files={"file": ("test.csv", csv_file, "text/csv")},
-        params={"file_path": "some/path.csv"},
+        json={
+            "csv_content": encoded_csv,
+            "file_path": "some/path.csv"
+        },
         headers=headers
     )
     
-    assert response.status_code == 400
-    assert "not both" in response.json()["detail"]
+    assert response.status_code == 422  # Validation error from Pydantic
+    assert "not both" in str(response.json())
 
 
-def test_ingest_invalid_file_type():
-    """Test ingestion fails with non-CSV file"""
-    txt_file = io.BytesIO(b"This is not a CSV file")
-    
+def test_ingest_invalid_base64():
+    """Test ingestion fails with invalid base64 content"""
     response = client.post(
         "/ingest/",
-        files={"file": ("test.txt", txt_file, "text/plain")},
+        json={
+            "csv_content": "not-valid-base64!@#$%"
+        },
         headers=headers
     )
     
-    assert response.status_code == 400
-    assert "Invalid file type" in response.json()["detail"]
+    assert response.status_code == 422  # Validation error
+    assert "valid base64" in str(response.json())
 
 
 def test_ingest_invalid_csv_data():
     """Test handling of invalid CSV data"""
-    csv_file = io.BytesIO(INVALID_CSV.encode('utf-8'))
+    encoded_csv = base64.b64encode(INVALID_CSV.encode('utf-8')).decode('utf-8')
     
     response = client.post(
         "/ingest/",
-        files={"file": ("invalid.csv", csv_file, "text/csv")},
-        params={"skip_invalid": True},
+        json={
+            "csv_content": encoded_csv,
+            "skip_invalid": True
+        },
         headers=headers
     )
     
@@ -202,11 +211,13 @@ def test_ingest_invalid_csv_data():
 
 def test_ingest_empty_csv():
     """Test handling of empty CSV file"""
-    csv_file = io.BytesIO(EMPTY_CSV.encode('utf-8'))
+    encoded_csv = base64.b64encode(EMPTY_CSV.encode('utf-8')).decode('utf-8')
     
     response = client.post(
         "/ingest/",
-        files={"file": ("empty.csv", csv_file, "text/csv")},
+        json={
+            "csv_content": encoded_csv
+        },
         headers=headers
     )
     
@@ -219,12 +230,14 @@ def test_ingest_empty_csv():
 
 def test_ingest_with_enrichment():
     """Test ingestion with enrichment enabled (background task)"""
-    csv_file = io.BytesIO(SAMPLE_CSV.encode('utf-8'))
+    encoded_csv = base64.b64encode(SAMPLE_CSV.encode('utf-8')).decode('utf-8')
     
     response = client.post(
         "/ingest/",
-        files={"file": ("test.csv", csv_file, "text/csv")},
-        params={"enable_enrichment": True},
+        json={
+            "csv_content": encoded_csv,
+            "enable_enrichment": True  # This should be a proper boolean now
+        },
         headers=headers
     )
     
@@ -240,20 +253,20 @@ def test_ingest_with_enrichment():
 
 def test_ingest_duplicate_carriers():
     """Test handling of duplicate carriers in CSV"""
+    encoded_csv = base64.b64encode(SAMPLE_CSV.encode('utf-8')).decode('utf-8')
+    
     # First ingestion
-    csv_file1 = io.BytesIO(SAMPLE_CSV.encode('utf-8'))
     response1 = client.post(
         "/ingest/",
-        files={"file": ("test1.csv", csv_file1, "text/csv")},
+        json={"csv_content": encoded_csv},
         headers=headers
     )
     assert response1.status_code == 200
     
     # Second ingestion with same data
-    csv_file2 = io.BytesIO(SAMPLE_CSV.encode('utf-8'))
     response2 = client.post(
         "/ingest/",
-        files={"file": ("test2.csv", csv_file2, "text/csv")},
+        json={"csv_content": encoded_csv},
         headers=headers
     )
     assert response2.status_code == 200
@@ -299,11 +312,11 @@ def test_get_job_status():
 
 def test_ingest_creates_relationships():
     """Test that ingestion creates proper relationships"""
-    csv_file = io.BytesIO(SAMPLE_CSV.encode('utf-8'))
+    encoded_csv = base64.b64encode(SAMPLE_CSV.encode('utf-8')).decode('utf-8')
     
     response = client.post(
         "/ingest/",
-        files={"file": ("test.csv", csv_file, "text/csv")},
+        json={"csv_content": encoded_csv},
         headers=headers
     )
     
@@ -326,18 +339,113 @@ def test_ingest_creates_relationships():
 
 def test_ingest_fail_on_invalid():
     """Test that ingestion fails when skip_invalid=False"""
-    csv_file = io.BytesIO(INVALID_CSV.encode('utf-8'))
+    encoded_csv = base64.b64encode(INVALID_CSV.encode('utf-8')).decode('utf-8')
     
     response = client.post(
         "/ingest/",
-        files={"file": ("invalid.csv", csv_file, "text/csv")},
-        params={"skip_invalid": False},
+        json={
+            "csv_content": encoded_csv,
+            "skip_invalid": False
+        },
         headers=headers
     )
     
     # Should fail with validation error
     assert response.status_code == 422
     assert "CSV processing error" in response.json()["detail"]
+
+
+def test_get_sample_request():
+    """Test getting sample JSON request"""
+    response = client.get(
+        "/ingest/sample",
+        headers=headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    assert "examples" in data
+    assert "curl_examples" in data
+    assert len(data["examples"]) > 0
+    
+    # Check that examples have proper structure
+    for example in data["examples"]:
+        assert "request" in example or "note" in example
+
+
+def test_boolean_parsing_enrichment_true():
+    """Test that enable_enrichment=true properly triggers background processing"""
+    encoded_csv = base64.b64encode(SAMPLE_CSV.encode('utf-8')).decode('utf-8')
+    
+    # Test with boolean true (not string "true")
+    response = client.post(
+        "/ingest/",
+        json={
+            "csv_content": encoded_csv,
+            "enable_enrichment": True,  # Boolean true
+            "skip_invalid": True
+        },
+        headers=headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # With enrichment=true, should return processing status
+    assert data["status"] == "processing"
+    assert "job_id" in data
+    assert data.get("enrichment", {}).get("enabled") == True
+    assert data.get("enrichment", {}).get("status") == "queued"
+    assert "message" in data
+    assert "background" in data["message"].lower()
+
+
+def test_boolean_parsing_enrichment_false():
+    """Test that enable_enrichment=false properly runs synchronously"""
+    encoded_csv = base64.b64encode(SAMPLE_CSV.encode('utf-8')).decode('utf-8')
+    
+    # Test with boolean false (not string "false")
+    response = client.post(
+        "/ingest/",
+        json={
+            "csv_content": encoded_csv,
+            "enable_enrichment": False,  # Boolean false
+            "skip_invalid": True
+        },
+        headers=headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # With enrichment=false, should return completed status
+    assert data["status"] in ["completed", "completed_with_errors", "failed"]
+    assert "summary" in data
+    assert data.get("enrichment") is None or data.get("enrichment", {}).get("enabled") == False
+
+
+def test_default_boolean_values():
+    """Test that default boolean values work correctly"""
+    encoded_csv = base64.b64encode(SAMPLE_CSV.encode('utf-8')).decode('utf-8')
+    
+    # Test with no boolean parameters (should use defaults)
+    response = client.post(
+        "/ingest/",
+        json={
+            "csv_content": encoded_csv
+            # No enable_enrichment or skip_invalid specified
+        },
+        headers=headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Defaults: enable_enrichment=False, skip_invalid=True
+    # Should complete synchronously
+    assert data["status"] in ["completed", "completed_with_errors", "failed"]
+    assert "summary" in data
 
 
 def test_csv_parser_functions():
