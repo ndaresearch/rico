@@ -284,8 +284,13 @@ class TestSearchCarriersEnrichmentService:
                 with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
                     mock_to_thread.return_value = successful_enrichment_result
                     
-                    result = await enrich_carriers_async(sample_carrier_usdots, "test_job_133")
+                    # Pass insurance_data only to limit the calls
+                    result = await enrich_carriers_async(
+                        sample_carrier_usdots, 
+                        "test_job_133",
+                        {"insurance_data": True, "safety_data": False, "crash_data": False, "inspection_data": False}
+                    )
                     
-                    # Verify to_thread was called for each carrier
+                    # Verify to_thread was called for each carrier (only insurance data)
                     assert mock_to_thread.call_count == 3
                     assert result["carriers_processed"] == 3

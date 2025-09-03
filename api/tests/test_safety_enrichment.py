@@ -155,7 +155,12 @@ class TestSafetyEnrichmentService:
     @pytest.mark.asyncio
     async def test_high_risk_carrier_identification(self, mock_settings, mock_enricher):
         """Test identification of high-risk carriers based on OOS rates."""
-        enrichment_options = {"safety_data": True}
+        enrichment_options = {
+            "safety_data": True,
+            "insurance_data": False,
+            "crash_data": False,
+            "inspection_data": False
+        }
         
         # Configure high-risk OOS rates
         mock_enricher.enrich_carrier_safety_data.side_effect = [
@@ -168,7 +173,11 @@ class TestSafetyEnrichmentService:
             with patch('scripts.ingest.searchcarriers_insurance_enrichment.SearchCarriersInsuranceEnrichment',
                       return_value=mock_enricher):
                 with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
-                    mock_to_thread.side_effect = mock_enricher.enrich_carrier_safety_data.side_effect
+                    mock_to_thread.side_effect = iter([
+                        {"snapshot_created": True, "driver_oos_rate": 15.0, "vehicle_oos_rate": 30.0},  # High driver OOS
+                        {"snapshot_created": True, "driver_oos_rate": 8.0, "vehicle_oos_rate": 50.0},   # High vehicle OOS
+                        {"snapshot_created": True, "driver_oos_rate": 5.0, "vehicle_oos_rate": 20.0}    # Normal
+                    ])
                     
                     result = await enrich_carriers_async(
                         [1111111, 2222222, 3333333],
@@ -184,7 +193,12 @@ class TestSafetyEnrichmentService:
     @pytest.mark.asyncio
     async def test_fatal_crash_high_risk(self, mock_settings, mock_enricher):
         """Test identification of high-risk carriers based on fatal crashes."""
-        enrichment_options = {"crash_data": True}
+        enrichment_options = {
+            "crash_data": True,
+            "insurance_data": False,
+            "safety_data": False,
+            "inspection_data": False
+        }
         
         # Configure crash data with fatalities
         mock_enricher.enrich_carrier_crash_data.side_effect = [
@@ -197,7 +211,11 @@ class TestSafetyEnrichmentService:
             with patch('scripts.ingest.searchcarriers_insurance_enrichment.SearchCarriersInsuranceEnrichment',
                       return_value=mock_enricher):
                 with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
-                    mock_to_thread.side_effect = mock_enricher.enrich_carrier_crash_data.side_effect
+                    mock_to_thread.side_effect = iter([
+                        {"crash_count": 5, "fatal_crashes": 2, "injury_crashes": 1},  # Fatal crashes
+                        {"crash_count": 3, "fatal_crashes": 0, "injury_crashes": 3},  # No fatal
+                        {"crash_count": 2, "fatal_crashes": 1, "injury_crashes": 0}   # Fatal crash
+                    ])
                     
                     result = await enrich_carriers_async(
                         [4444444, 5555555, 6666666],
@@ -315,12 +333,21 @@ class TestSafetyEnrichmentService:
             with patch('scripts.ingest.searchcarriers_insurance_enrichment.SearchCarriersInsuranceEnrichment',
                       return_value=mock_enricher):
                 with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
-                    mock_to_thread.side_effect = mock_enricher.enrich_carrier_inspection_data.side_effect
+                    mock_to_thread.side_effect = iter([
+                        {"inspection_count": 10, "violation_count": 25},
+                        {"inspection_count": 15, "violation_count": 40},
+                        {"inspection_count": 5, "violation_count": 10}
+                    ])
                     
                     result = await enrich_carriers_async(
                         [7777777, 8888888, 9999999],
                         "test_stats_job",
-                        {"inspection_data": True}
+                        {
+                            "inspection_data": True,
+                            "insurance_data": False,
+                            "safety_data": False,
+                            "crash_data": False
+                        }
                     )
         
         assert result["inspections_created"] == 30  # 10 + 15 + 5

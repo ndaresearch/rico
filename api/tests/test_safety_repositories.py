@@ -228,7 +228,7 @@ class TestInspectionRepository:
             
             # Verify query checks OOS flags
             call_args = repo.execute_query.call_args
-            assert "vehicle_oos = true OR driver_oos = true OR i.hazmat_oos = true" in call_args[0][0]
+            assert "i.vehicle_oos = true OR i.driver_oos = true OR i.hazmat_oos = true" in call_args[0][0]
     
     def test_calculate_violation_rate(self, repo):
         """Test calculating violation rate statistics."""

@@ -82,7 +82,7 @@ async def get_carrier_safety_profile(usdot: int):
 
 
 @router.get("/{usdot}/crashes",
-            response_model=List[Dict],
+            response_model=Dict,
             summary="Get carrier crashes",
             description="Returns crash history with severity information")
 async def get_carrier_crashes(
@@ -270,7 +270,6 @@ async def get_carrier_risk_assessment(usdot: int):
 
 
 @router.get("/high-risk",
-            response_model=List[Dict],
             summary="Get high-risk carriers",
             description="Returns carriers with high OOS rates or fatal crashes")
 async def get_high_risk_carriers(

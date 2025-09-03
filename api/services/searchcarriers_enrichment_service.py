@@ -103,10 +103,14 @@ async def enrich_carriers_async(carrier_usdots: List[int], job_id: str, enrichme
                             enricher.enrich_carrier_by_usdot,
                             usdot
                         )
-                        results["policies_created"] += insurance_result.get("policies_created", 0)
-                        results["events_created"] += insurance_result.get("events_created", 0)
-                        results["gaps_detected"] += insurance_result.get("gaps_found", 0)
-                        carrier_result["insurance"] = insurance_result
+                        if insurance_result and isinstance(insurance_result, dict):
+                            results["policies_created"] += insurance_result.get("policies_created", 0)
+                            results["events_created"] += insurance_result.get("events_created", 0)
+                            results["gaps_detected"] += insurance_result.get("gaps_found", 0)
+                            carrier_result["insurance"] = insurance_result
+                            # Check for errors in the result
+                            if insurance_result.get("error"):
+                                carrier_result["error"] = insurance_result["error"]
                     
                     # Enrich with safety data if requested
                     if enrichment_options.get("safety_data", False):
@@ -114,15 +118,16 @@ async def enrich_carriers_async(carrier_usdots: List[int], job_id: str, enrichme
                             enricher.enrich_carrier_safety_data,
                             usdot
                         )
-                        if safety_result.get("snapshot_created"):
-                            results["safety_snapshots_created"] += 1
-                        
-                        # Check if high risk based on OOS rates
-                        if safety_result.get("driver_oos_rate", 0) > 10.0 or \
-                           safety_result.get("vehicle_oos_rate", 0) > 40.0:
-                            results["high_risk_carriers"].append(usdot)
-                        
-                        carrier_result["safety"] = safety_result
+                        if safety_result and isinstance(safety_result, dict):
+                            if safety_result.get("snapshot_created"):
+                                results["safety_snapshots_created"] += 1
+                            
+                            # Check if high risk based on OOS rates
+                            if safety_result.get("driver_oos_rate", 0) > 10.0 or \
+                               safety_result.get("vehicle_oos_rate", 0) > 40.0:
+                                results["high_risk_carriers"].append(usdot)
+                            
+                            carrier_result["safety"] = safety_result
                     
                     # Enrich with crash data if requested
                     if enrichment_options.get("crash_data", False):
@@ -130,16 +135,17 @@ async def enrich_carriers_async(carrier_usdots: List[int], job_id: str, enrichme
                             enricher.enrich_carrier_crash_data,
                             usdot
                         )
-                        results["crashes_found"] += crash_result.get("crash_count", 0)
-                        results["fatal_crashes"] += crash_result.get("fatal_crashes", 0)
-                        results["injury_crashes"] += crash_result.get("injury_crashes", 0)
-                        
-                        # High risk if fatal crashes
-                        if crash_result.get("fatal_crashes", 0) > 0:
-                            if usdot not in results["high_risk_carriers"]:
-                                results["high_risk_carriers"].append(usdot)
-                        
-                        carrier_result["crashes"] = crash_result
+                        if crash_result and isinstance(crash_result, dict):
+                            results["crashes_found"] += crash_result.get("crash_count", 0)
+                            results["fatal_crashes"] += crash_result.get("fatal_crashes", 0)
+                            results["injury_crashes"] += crash_result.get("injury_crashes", 0)
+                            
+                            # High risk if fatal crashes
+                            if crash_result.get("fatal_crashes", 0) > 0:
+                                if usdot not in results["high_risk_carriers"]:
+                                    results["high_risk_carriers"].append(usdot)
+                            
+                            carrier_result["crashes"] = crash_result
                     
                     # Enrich with inspection data if requested
                     if enrichment_options.get("inspection_data", False):
@@ -147,9 +153,10 @@ async def enrich_carriers_async(carrier_usdots: List[int], job_id: str, enrichme
                             enricher.enrich_carrier_inspection_data,
                             usdot
                         )
-                        results["inspections_created"] += inspection_result.get("inspection_count", 0)
-                        results["violations_created"] += inspection_result.get("violation_count", 0)
-                        carrier_result["inspections"] = inspection_result
+                        if inspection_result and isinstance(inspection_result, dict):
+                            results["inspections_created"] += inspection_result.get("inspection_count", 0)
+                            results["violations_created"] += inspection_result.get("violation_count", 0)
+                            carrier_result["inspections"] = inspection_result
                     
                     # Update statistics
                     results["carriers_processed"] += 1

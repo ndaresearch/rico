@@ -188,6 +188,11 @@ app.include_router(
 )
 
 app.include_router(
+    safety_router,
+    dependencies=[Depends(verify_api_key)]
+)
+
+app.include_router(
     carrier_router,
     dependencies=[Depends(verify_api_key)]
 )
@@ -204,11 +209,6 @@ app.include_router(
 
 app.include_router(
     ingest_router,
-    dependencies=[Depends(verify_api_key)]
-)
-
-app.include_router(
-    safety_router,
     dependencies=[Depends(verify_api_key)]
 )
 
