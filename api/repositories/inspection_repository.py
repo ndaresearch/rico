@@ -15,27 +15,40 @@ class InspectionRepository(BaseRepository):
     def create(self, inspection: Inspection) -> Dict:
         """Create a new inspection node in the graph database.
         
+        Uses MERGE to prevent duplicate inspections based on inspection_id.
+        
         Args:
             inspection: Inspection model with all required properties
             
         Returns:
-            dict: Created inspection node data or None if creation fails
+            dict: Created or merged inspection node data or None if operation fails
         """
         query = """
-        CREATE (i:Inspection {
-            inspection_id: $inspection_id,
-            usdot: $usdot,
-            inspection_date: $inspection_date,
-            level: $level,
-            state: $state,
-            location: $location,
-            violations_count: $violations_count,
-            oos_violations_count: $oos_violations_count,
-            vehicle_oos: $vehicle_oos,
-            driver_oos: $driver_oos,
-            hazmat_oos: $hazmat_oos,
-            result: $result
-        })
+        MERGE (i:Inspection {inspection_id: $inspection_id})
+        ON CREATE SET
+            i.usdot = $usdot,
+            i.inspection_date = $inspection_date,
+            i.level = $level,
+            i.state = $state,
+            i.location = $location,
+            i.violations_count = $violations_count,
+            i.oos_violations_count = $oos_violations_count,
+            i.vehicle_oos = $vehicle_oos,
+            i.driver_oos = $driver_oos,
+            i.hazmat_oos = $hazmat_oos,
+            i.result = $result
+        ON MATCH SET
+            i.usdot = $usdot,
+            i.inspection_date = $inspection_date,
+            i.level = $level,
+            i.state = $state,
+            i.location = $location,
+            i.violations_count = $violations_count,
+            i.oos_violations_count = $oos_violations_count,
+            i.vehicle_oos = $vehicle_oos,
+            i.driver_oos = $driver_oos,
+            i.hazmat_oos = $hazmat_oos,
+            i.result = $result
         RETURN i
         """
         

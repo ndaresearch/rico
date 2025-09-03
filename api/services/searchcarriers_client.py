@@ -441,18 +441,74 @@ class SearchCarriersClient:
             inspections = result["data"]
             logger.info(f"Found {len(inspections)} inspections for DOT {dot_number}")
             
-            # Process inspection data
+            # Process inspection data with correct field mapping from API
             for inspection in inspections:
                 inspection["dot_number"] = dot_number
                 inspection["fetched_at"] = datetime.now(timezone.utc).isoformat()
                 
-                # Categorize inspection result
-                if inspection.get("oos_count", 0) > 0:
+                # Map actual API field names to expected field names
+                # The API returns different field names than documented
+                
+                # Map date field: insp_date -> inspection_date
+                if "insp_date" in inspection:
+                    inspection["inspection_date"] = inspection["insp_date"]
+                    # Parse the date to ensure it's in ISO format
+                    try:
+                        if inspection["inspection_date"]:
+                            # Convert from "2025-08-25 00:00:00" to "2025-08-25"
+                            date_str = str(inspection["inspection_date"]).split()[0]
+                            inspection["inspection_date"] = date_str
+                    except Exception as e:
+                        logger.warning(f"Could not parse date for inspection {inspection.get('inspection_id')}: {e}")
+                
+                # Map violation fields
+                if "viol_total" in inspection:
+                    inspection["violations_count"] = inspection["viol_total"]
+                
+                # Map OOS fields  
+                if "oos_total" in inspection:
+                    inspection["oos_violations_count"] = inspection["oos_total"]
+                
+                # Convert numeric OOS fields to boolean (handle string values from API)
+                try:
+                    driver_oos_val = int(inspection.get("driver_oos_total", 0))
+                except (ValueError, TypeError):
+                    driver_oos_val = 0
+                inspection["driver_oos"] = driver_oos_val > 0
+                
+                try:
+                    vehicle_oos_val = int(inspection.get("vehicle_oos_total", 0))
+                except (ValueError, TypeError):
+                    vehicle_oos_val = 0
+                inspection["vehicle_oos"] = vehicle_oos_val > 0
+                
+                try:
+                    hazmat_oos_val = int(inspection.get("hazmat_oos_total", 0))
+                except (ValueError, TypeError):
+                    hazmat_oos_val = 0
+                inspection["hazmat_oos"] = hazmat_oos_val > 0
+                
+                # Categorize inspection result based on actual violations
+                try:
+                    oos_count = int(inspection.get("oos_total", 0))
+                except (ValueError, TypeError):
+                    oos_count = 0
+                    
+                try:
+                    violations_count = int(inspection.get("viol_total", 0))
+                except (ValueError, TypeError):
+                    violations_count = 0
+                
+                if oos_count > 0:
                     inspection["result"] = "OOS"
-                elif inspection.get("violations_count", 0) > 0:
+                elif violations_count > 0:
                     inspection["result"] = "Violations"
                 else:
                     inspection["result"] = "Clean"
+                
+                # Log suspicious data patterns
+                if violations_count > 100:
+                    logger.warning(f"Unusually high violation count {violations_count} for inspection {inspection.get('inspection_id')}")
         
         return result
     

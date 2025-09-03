@@ -637,6 +637,161 @@ class SearchCarriersInsuranceEnrichment:
             logger.error(f"Error fetching crash data for {usdot}: {e}")
             return {"error": str(e)}
     
+    def _process_inspection_batch(self, inspections: List[Dict], usdot: int) -> tuple:
+        """Process a batch of inspection records.
+        
+        Args:
+            inspections: List of inspection data from API
+            usdot: USDOT number of the carrier
+            
+        Returns:
+            tuple: (inspection_count, violation_count, oos_inspections)
+        """
+        inspection_count = 0
+        violation_count = 0
+        oos_inspections = 0
+        
+        for inspection_data in inspections:
+            try:
+                # Parse inspection date with proper error handling
+                inspection_date = None
+                date_field = inspection_data.get("inspection_date")
+                
+                if date_field:
+                    try:
+                        # Try standard ISO format first
+                        inspection_date = datetime.strptime(date_field, "%Y-%m-%d").date()
+                    except ValueError:
+                        try:
+                            # Try ISO datetime format
+                            inspection_date = datetime.fromisoformat(date_field).date()
+                        except ValueError:
+                            logger.error(f"Failed to parse inspection date '{date_field}' for inspection {inspection_data.get('inspection_id')}")
+                            continue  # Skip this inspection if date parsing fails
+                else:
+                    logger.error(f"No inspection_date field for inspection {inspection_data.get('inspection_id')}")
+                    continue  # Skip inspections without dates
+                
+                # Validate date is reasonable (not future, not too old)
+                today = date.today()
+                if inspection_date > today:
+                    logger.warning(f"Future inspection date {inspection_date} for inspection {inspection_data.get('inspection_id')}")
+                    continue
+                if inspection_date < date(2000, 1, 1):
+                    logger.warning(f"Very old inspection date {inspection_date} for inspection {inspection_data.get('inspection_id')}")
+                    continue
+                
+                # Use the mapped field names from the client
+                # The client has already mapped the API fields to our expected names
+                # Ensure they are integers
+                try:
+                    violations_actual = int(inspection_data.get("violations_count", 0))
+                except (ValueError, TypeError):
+                    violations_actual = 0
+                    
+                try:
+                    oos_count = int(inspection_data.get("oos_violations_count", 0))
+                except (ValueError, TypeError):
+                    oos_count = 0
+                
+                # Create Inspection instance with correct field mapping
+                inspection = Inspection(
+                    inspection_id=inspection_data.get("inspection_id", f"INSP-{usdot}-{datetime.now().timestamp()}"),
+                    usdot=usdot,
+                    inspection_date=inspection_date,
+                    level=inspection_data.get("level", 0),
+                    state=inspection_data.get("state", ""),
+                    location=inspection_data.get("location"),
+                    violations_count=violations_actual,
+                    oos_violations_count=oos_count,
+                    vehicle_oos=inspection_data.get("vehicle_oos", False),
+                    driver_oos=inspection_data.get("driver_oos", False),
+                    hazmat_oos=inspection_data.get("hazmat_oos", False),
+                    result=inspection_data.get("result", "Clean" if violations_actual == 0 else "Violations")
+                )
+                
+                # Save to Neo4j (MERGE will prevent duplicates)
+                created_inspection = self.inspection_repo.create(inspection)
+                
+                if created_inspection:
+                    # Create relationship to carrier
+                    self.inspection_repo.create_relationship_to_carrier(usdot, inspection)
+                    inspection_count += 1
+                    
+                    # Count OOS inspections
+                    # Ensure oos_count is an integer for comparison
+                    try:
+                        oos_int = int(oos_count) if oos_count is not None else 0
+                    except (ValueError, TypeError):
+                        oos_int = 0
+                    
+                    if inspection.driver_oos or inspection.vehicle_oos or oos_int > 0:
+                        oos_inspections += 1
+                    
+                    # Process violations if present
+                    violations = inspection_data.get("violations", [])
+                    if violations:
+                        violation_ids = []
+                        for violation_data in violations:
+                            try:
+                                # Create Violation instance
+                                violation = Violation(
+                                    violation_id=violation_data.get("violation_id", f"VIOL-{inspection.inspection_id}-{violation_count}"),
+                                    inspection_id=inspection.inspection_id,
+                                    code=violation_data.get("code"),
+                                    description=violation_data.get("description"),
+                                    category=violation_data.get("category"),
+                                    severity_weight=violation_data.get("severity_weight"),
+                                    oos_indicator=violation_data.get("oos_indicator"),
+                                    violation_date=inspection.inspection_date,
+                                    inspection_state=inspection.state,
+                                    inspection_level=inspection.level
+                                )
+                                
+                                # Create violation node using MERGE to prevent duplicates
+                                violation_query = """
+                                MERGE (v:Violation {violation_id: $violation_id})
+                                ON CREATE SET
+                                    v.inspection_id = $inspection_id,
+                                    v.code = $code,
+                                    v.description = $description,
+                                    v.category = $category,
+                                    v.severity_weight = $severity_weight,
+                                    v.oos_indicator = $oos_indicator,
+                                    v.violation_date = $violation_date,
+                                    v.inspection_state = $inspection_state,
+                                    v.inspection_level = $inspection_level
+                                RETURN v
+                                """
+                                
+                                violation_params = violation.model_dump()
+                                if violation_params.get('violation_date'):
+                                    violation_params['violation_date'] = violation_params['violation_date'].isoformat()
+                                
+                                # Execute query using inspection repo's connection
+                                violation_result = self.inspection_repo.execute_query(violation_query, violation_params)
+                                
+                                if violation_result:
+                                    violation_ids.append(violation.violation_id)
+                                    violation_count += 1
+                            
+                            except Exception as e:
+                                logger.error(f"Error creating violation for inspection {inspection.inspection_id}: {e}")
+                                continue
+                        
+                        # Link violations to inspection
+                        if violation_ids:
+                            self.inspection_repo.link_violations(inspection.inspection_id, violation_ids)
+                    
+                    # Add to violation count even if no detailed violations
+                    violation_count += violations_actual
+            
+            except Exception as e:
+                logger.error(f"Error processing inspection for carrier {usdot}: {e}")
+                continue
+        
+        return inspection_count, violation_count, oos_inspections
+    
     def enrich_carrier_inspection_data(self, usdot: int) -> Dict:
         """Enrich a carrier with inspection and violation data from SearchCarriers.
         
@@ -664,132 +819,42 @@ class SearchCarriersInsuranceEnrichment:
                 }
             
             inspections = result["data"]
-            inspection_count = 0
-            violation_count = 0
-            oos_inspections = 0
             
-            for inspection_data in inspections:
-                try:
-                    # Parse inspection date
-                    inspection_date = None
-                    if inspection_data.get("inspection_date"):
-                        try:
-                            inspection_date = datetime.strptime(inspection_data["inspection_date"], "%Y-%m-%d").date()
-                        except ValueError:
-                            inspection_date = datetime.fromisoformat(inspection_data["inspection_date"]).date()
-                    
-                    # Create Inspection instance
-                    inspection = Inspection(
-                        inspection_id=inspection_data.get("inspection_id", f"INSP-{usdot}-{inspection_count}"),
-                        usdot=usdot,
-                        inspection_date=inspection_date or date.today(),
-                        level=inspection_data.get("level", 0),
-                        state=inspection_data.get("state", ""),
-                        location=inspection_data.get("location"),
-                        violations_count=inspection_data.get("violations_count", 0),
-                        oos_violations_count=inspection_data.get("oos_violations_count", 0),
-                        vehicle_oos=inspection_data.get("vehicle_oos", False),
-                        driver_oos=inspection_data.get("driver_oos", False),
-                        hazmat_oos=inspection_data.get("hazmat_oos", False),
-                        result=inspection_data.get("result", "PASS")
-                    )
-                    
-                    # Save to Neo4j
-                    created_inspection = self.inspection_repo.create(inspection)
-                    
-                    if created_inspection:
-                        # Create relationship to carrier
-                        self.inspection_repo.create_relationship_to_carrier(usdot, inspection)
-                        inspection_count += 1
-                        
-                        # Count OOS inspections
-                        if inspection.driver_oos or inspection.vehicle_oos:
-                            oos_inspections += 1
-                        
-                        # Process violations if present
-                        violations = inspection_data.get("violations", [])
-                        if violations:
-                            violation_ids = []
-                            for violation_data in violations:
-                                try:
-                                    # Create Violation instance
-                                    violation = Violation(
-                                        violation_id=violation_data.get("violation_id", f"VIOL-{inspection.inspection_id}-{violation_count}"),
-                                        inspection_id=inspection.inspection_id,
-                                        code=violation_data.get("code"),
-                                        description=violation_data.get("description"),
-                                        category=violation_data.get("category"),
-                                        severity_weight=violation_data.get("severity_weight"),
-                                        oos_indicator=violation_data.get("oos_indicator"),
-                                        violation_date=inspection.inspection_date,
-                                        inspection_state=inspection.state,
-                                        inspection_level=inspection.level
-                                    )
-                                    
-                                    # Create violation node directly with Cypher (no ViolationRepository)
-                                    violation_query = """
-                                    CREATE (v:Violation {
-                                        violation_id: $violation_id,
-                                        inspection_id: $inspection_id,
-                                        code: $code,
-                                        description: $description,
-                                        category: $category,
-                                        severity_weight: $severity_weight,
-                                        oos_indicator: $oos_indicator,
-                                        violation_date: $violation_date,
-                                        inspection_state: $inspection_state,
-                                        inspection_level: $inspection_level
-                                    })
-                                    RETURN v
-                                    """
-                                    
-                                    violation_params = violation.model_dump()
-                                    if violation_params.get('violation_date'):
-                                        violation_params['violation_date'] = violation_params['violation_date'].isoformat()
-                                    
-                                    # Execute query using inspection repo's connection
-                                    violation_result = self.inspection_repo.execute_query(violation_query, violation_params)
-                                    
-                                    if violation_result:
-                                        violation_ids.append(violation.violation_id)
-                                        violation_count += 1
-                                
-                                except Exception as e:
-                                    logger.error(f"Error creating violation for inspection {inspection.inspection_id}: {e}")
-                                    continue
-                            
-                            # Link violations to inspection
-                            if violation_ids:
-                                self.inspection_repo.link_violations(inspection.inspection_id, violation_ids)
-                
-                except Exception as e:
-                    logger.error(f"Error processing inspection for carrier {usdot}: {e}")
-                    continue
+            # Process first batch of inspections using helper method
+            total_inspections, total_violations, total_oos = self._process_inspection_batch(inspections, usdot)
             
             # Handle pagination if needed
             if len(inspections) == 100:
                 page = 2
                 while True:
+                    logger.info(f"Fetching page {page} of inspections for carrier {usdot}")
                     additional_result = self.client.get_inspections(usdot, since_months=24, page=page)
+                    
                     if not additional_result.get("data"):
                         break
                     
-                    # Process additional inspections (same logic as above)
-                    inspection_count += len(additional_result["data"])
+                    # Process additional inspections using the same helper method
+                    batch_inspections, batch_violations, batch_oos = self._process_inspection_batch(
+                        additional_result["data"], usdot
+                    )
+                    
+                    total_inspections += batch_inspections
+                    total_violations += batch_violations
+                    total_oos += batch_oos
                     
                     if len(additional_result["data"]) < 100:
                         break
                     page += 1
             
-            logger.info(f"Created {inspection_count} inspection records with {violation_count} violations for carrier {usdot}")
+            logger.info(f"Created {total_inspections} inspection records with {total_violations} violations for carrier {usdot}")
             
-            if oos_inspections > 0:
-                logger.warning(f"Carrier {usdot} has {oos_inspections} OOS inspections")
+            if total_oos > 0:
+                logger.warning(f"Carrier {usdot} has {total_oos} OOS inspections")
             
             return {
-                "inspection_count": inspection_count,
-                "violation_count": violation_count,
-                "oos_inspections": oos_inspections
+                "inspection_count": total_inspections,
+                "violation_count": total_violations,
+                "oos_inspections": total_oos
             }
             
         except Exception as e:
