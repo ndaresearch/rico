@@ -8,10 +8,12 @@ class Crash(BaseModel):
     # Identifiers
     report_number: str
     report_state: Optional[str] = None
+    usdot: int
 
     # Incident Details
     crash_date: datetime
     severity: Optional[str] = None
+    tow_away: bool = False
 
     # Counts
     fatalities: Optional[int] = None

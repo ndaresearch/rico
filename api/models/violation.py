@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class Violation(BaseModel):
     # Identifiers
     violation_id: str
+    inspection_id: Optional[str] = None
 
     # Violation Details
     code: Optional[str] = None

@@ -7,7 +7,7 @@ import os
 import time
 import logging
 from typing import Dict, List, Optional, Any
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -346,6 +346,146 @@ class SearchCarriersClient:
         logger.info(f"Fetching authorities for DOT {dot_number}")
         return self._make_request(endpoint, params)
     
+    def get_safety_summary(self, dot_number: int, since_months: int = 24) -> Dict:
+        """Fetch comprehensive safety metrics for a carrier.
+        
+        Args:
+            dot_number: USDOT number of the carrier
+            since_months: Months to look back for metrics
+            
+        Returns:
+            dict: Safety summary including OOS rates and SMS BASIC scores
+        """
+        endpoint = f"/v1/company/{dot_number}/safety-summary"
+        params = {"sinceMonths": since_months}
+        
+        logger.info(f"Fetching safety summary for DOT {dot_number}")
+        result = self._make_request(endpoint, params)
+        
+        if "data" in result and result["data"] and not isinstance(result["data"], list):
+            safety_data = result["data"]
+            logger.info(f"Retrieved safety metrics for DOT {dot_number}")
+            
+            # Normalize the response
+            safety_data["dot_number"] = dot_number
+            safety_data["fetched_at"] = datetime.now(timezone.utc).isoformat()
+            
+            # Add risk flags based on national averages
+            if "driver_oos_rate" in safety_data:
+                safety_data["driver_oos_high_risk"] = safety_data["driver_oos_rate"] > 10.0  # 2x national avg
+            if "vehicle_oos_rate" in safety_data:
+                safety_data["vehicle_oos_high_risk"] = safety_data["vehicle_oos_rate"] > 40.0  # 2x national avg
+        
+        return result
+    
+    def get_crashes(self, dot_number: int, page: int = 1, per_page: int = 100) -> Dict:
+        """Fetch crash history for a carrier.
+        
+        Args:
+            dot_number: USDOT number of the carrier
+            page: Page number for pagination
+            per_page: Number of results per page
+            
+        Returns:
+            dict: Crash history with fatalities, injuries, and dates
+        """
+        endpoint = f"/v1/company/{dot_number}/crashes"
+        params = {"page": page, "perPage": per_page}
+        
+        logger.info(f"Fetching crash history for DOT {dot_number}")
+        result = self._make_request(endpoint, params)
+        
+        if "data" in result and isinstance(result["data"], list):
+            crashes = result["data"]
+            logger.info(f"Found {len(crashes)} crashes for DOT {dot_number}")
+            
+            # Enhance crash data
+            for crash in crashes:
+                crash["dot_number"] = dot_number
+                crash["fetched_at"] = datetime.now(timezone.utc).isoformat()
+                
+                # Determine severity level
+                if crash.get("fatalities", 0) > 0:
+                    crash["severity_level"] = "FATAL"
+                elif crash.get("injuries", 0) > 0:
+                    crash["severity_level"] = "INJURY"
+                else:
+                    crash["severity_level"] = "PROPERTY"
+        
+        return result
+    
+    def get_inspections(self, dot_number: int, since_months: int = 24, 
+                       page: int = 1, per_page: int = 100) -> Dict:
+        """Fetch inspection records with violations for a carrier.
+        
+        Args:
+            dot_number: USDOT number of the carrier
+            since_months: Months to look back for inspections
+            page: Page number for pagination
+            per_page: Number of results per page
+            
+        Returns:
+            dict: Inspection records with violation details
+        """
+        endpoint = f"/v1/company/{dot_number}/inspections"
+        params = {
+            "sinceMonths": since_months,
+            "page": page,
+            "perPage": per_page
+        }
+        
+        logger.info(f"Fetching inspections for DOT {dot_number}")
+        result = self._make_request(endpoint, params)
+        
+        if "data" in result and isinstance(result["data"], list):
+            inspections = result["data"]
+            logger.info(f"Found {len(inspections)} inspections for DOT {dot_number}")
+            
+            # Process inspection data
+            for inspection in inspections:
+                inspection["dot_number"] = dot_number
+                inspection["fetched_at"] = datetime.now(timezone.utc).isoformat()
+                
+                # Categorize inspection result
+                if inspection.get("oos_count", 0) > 0:
+                    inspection["result"] = "OOS"
+                elif inspection.get("violations_count", 0) > 0:
+                    inspection["result"] = "Violations"
+                else:
+                    inspection["result"] = "Clean"
+        
+        return result
+    
+    def get_out_of_service_orders(self, dot_number: int, 
+                                 page: int = 1, per_page: int = 100) -> Dict:
+        """Fetch out-of-service orders for a carrier.
+        
+        Args:
+            dot_number: USDOT number of the carrier
+            page: Page number for pagination
+            per_page: Number of results per page
+            
+        Returns:
+            dict: Out-of-service violations and orders
+        """
+        endpoint = f"/v1/company/{dot_number}/out-of-service-orders"
+        params = {"page": page, "perPage": per_page}
+        
+        logger.info(f"Fetching OOS orders for DOT {dot_number}")
+        result = self._make_request(endpoint, params)
+        
+        if "data" in result and isinstance(result["data"], list):
+            oos_orders = result["data"]
+            logger.info(f"Found {len(oos_orders)} OOS orders for DOT {dot_number}")
+            
+            # Add metadata
+            for order in oos_orders:
+                order["dot_number"] = dot_number
+                order["fetched_at"] = datetime.now(timezone.utc).isoformat()
+                order["is_critical"] = True  # All OOS orders are critical
+        
+        return result
+    
     def batch_enrich_carriers(self, dot_numbers: List[int],
                                    delay_seconds: float = 1.0) -> List[Dict]:
         """Batch process multiple carriers with rate limiting.
@@ -383,7 +523,7 @@ class SearchCarriersClient:
                     "compliance": compliance,
                     "coverage_gaps": gaps,
                     "provider_shopping": shopping,
-                    "enriched_at": datetime.utcnow().isoformat()
+                    "enriched_at": datetime.now(timezone.utc).isoformat()
                 })
                 
             except Exception as e:
@@ -391,7 +531,7 @@ class SearchCarriersClient:
                 results.append({
                     "dot_number": dot,
                     "error": str(e),
-                    "enriched_at": datetime.utcnow().isoformat()
+                    "enriched_at": datetime.now(timezone.utc).isoformat()
                 })
             
             # Rate limiting between carriers

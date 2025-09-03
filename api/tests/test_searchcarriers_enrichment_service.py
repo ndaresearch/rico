@@ -84,8 +84,12 @@ class TestSearchCarriersEnrichmentService:
                 MockEnricher.return_value = mock_enricher
                 mock_enricher.enrich_carrier_by_usdot.return_value = successful_enrichment_result
                 
-                # Run enrichment
-                result = await enrich_carriers_async(sample_carrier_usdots, "test_job_123")
+                # Run enrichment with only insurance data (old behavior)
+                result = await enrich_carriers_async(
+                    sample_carrier_usdots, 
+                    "test_job_123",
+                    {"insurance_data": True, "safety_data": False, "crash_data": False, "inspection_data": False}
+                )
                 
                 # Verify results
                 assert result["job_id"] == "test_job_123"
@@ -137,7 +141,11 @@ class TestSearchCarriersEnrichmentService:
             with patch('scripts.ingest.searchcarriers_insurance_enrichment.SearchCarriersInsuranceEnrichment') as MockEnricher:
                 MockEnricher.return_value = mock_enricher
                 
-                result = await enrich_carriers_async(sample_carrier_usdots, "test_job_125")
+                result = await enrich_carriers_async(
+                    sample_carrier_usdots, 
+                    "test_job_125",
+                    {"insurance_data": True, "safety_data": False, "crash_data": False, "inspection_data": False}
+                )
                 
                 assert result["status"] == "completed_with_errors"
                 assert result["carriers_processed"] == 3
@@ -247,7 +255,11 @@ class TestSearchCarriersEnrichmentService:
             with patch('scripts.ingest.searchcarriers_insurance_enrichment.SearchCarriersInsuranceEnrichment') as MockEnricher:
                 MockEnricher.return_value = mock_enricher
                 
-                result = await enrich_carriers_async(sample_carrier_usdots, "test_job_132")
+                result = await enrich_carriers_async(
+                    sample_carrier_usdots, 
+                    "test_job_132",
+                    {"insurance_data": True, "safety_data": False, "crash_data": False, "inspection_data": False}
+                )
                 
                 assert "execution_time_seconds" in result
                 assert result["execution_time_seconds"] >= 0

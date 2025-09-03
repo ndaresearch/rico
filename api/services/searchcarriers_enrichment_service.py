@@ -22,22 +22,36 @@ from database import db
 logger = logging.getLogger(__name__)
 
 
-async def enrich_carriers_async(carrier_usdots: List[int], job_id: str) -> Dict:
+async def enrich_carriers_async(carrier_usdots: List[int], job_id: str, enrichment_options: Dict = None) -> Dict:
     """
-    Asynchronously enrich carriers with SearchCarriers insurance data.
+    Asynchronously enrich carriers with SearchCarriers data.
     
     This function is called by the ingestion orchestrator when enrichment
     is enabled. It processes carriers in the background, fetching insurance
-    history and creating temporal relationships.
+    history, safety data, crash data, and inspection records.
     
     Args:
         carrier_usdots: List of carrier USDOT numbers to enrich
         job_id: Job ID for tracking the enrichment process
+        enrichment_options: Dict with options:
+            - safety_data: bool - Fetch OOS rates & SMS scores
+            - crash_data: bool - Fetch crash history
+            - inspection_data: bool - Fetch inspections & violations
+            - insurance_data: bool - Fetch insurance history
         
     Returns:
         Dictionary with enrichment results and statistics
     """
     logger.info(f"Starting enrichment job {job_id} for {len(carrier_usdots)} carriers")
+    
+    # Default options if not provided
+    if enrichment_options is None:
+        enrichment_options = {
+            "safety_data": True,
+            "crash_data": True,
+            "inspection_data": True,
+            "insurance_data": True
+        }
     
     start_time = datetime.now(timezone.utc)
     results = {
@@ -47,6 +61,13 @@ async def enrich_carriers_async(carrier_usdots: List[int], job_id: str) -> Dict:
         "policies_created": 0,
         "events_created": 0,
         "gaps_detected": 0,
+        "safety_snapshots_created": 0,
+        "crashes_found": 0,
+        "fatal_crashes": 0,
+        "injury_crashes": 0,
+        "inspections_created": 0,
+        "violations_created": 0,
+        "high_risk_carriers": [],
         "errors": [],
         "started_at": start_time.isoformat()
     }
@@ -74,26 +95,73 @@ async def enrich_carriers_async(carrier_usdots: List[int], job_id: str) -> Dict:
             # Process each carrier in the batch
             for usdot in batch:
                 try:
-                    # Enrich the carrier
-                    result = await asyncio.to_thread(
-                        enricher.enrich_carrier_by_usdot,
-                        usdot
-                    )
+                    carrier_result = {"usdot": usdot}
+                    
+                    # Enrich with insurance data if requested
+                    if enrichment_options.get("insurance_data", True):
+                        insurance_result = await asyncio.to_thread(
+                            enricher.enrich_carrier_by_usdot,
+                            usdot
+                        )
+                        results["policies_created"] += insurance_result.get("policies_created", 0)
+                        results["events_created"] += insurance_result.get("events_created", 0)
+                        results["gaps_detected"] += insurance_result.get("gaps_found", 0)
+                        carrier_result["insurance"] = insurance_result
+                    
+                    # Enrich with safety data if requested
+                    if enrichment_options.get("safety_data", False):
+                        safety_result = await asyncio.to_thread(
+                            enricher.enrich_carrier_safety_data,
+                            usdot
+                        )
+                        if safety_result.get("snapshot_created"):
+                            results["safety_snapshots_created"] += 1
+                        
+                        # Check if high risk based on OOS rates
+                        if safety_result.get("driver_oos_rate", 0) > 10.0 or \
+                           safety_result.get("vehicle_oos_rate", 0) > 40.0:
+                            results["high_risk_carriers"].append(usdot)
+                        
+                        carrier_result["safety"] = safety_result
+                    
+                    # Enrich with crash data if requested
+                    if enrichment_options.get("crash_data", False):
+                        crash_result = await asyncio.to_thread(
+                            enricher.enrich_carrier_crash_data,
+                            usdot
+                        )
+                        results["crashes_found"] += crash_result.get("crash_count", 0)
+                        results["fatal_crashes"] += crash_result.get("fatal_crashes", 0)
+                        results["injury_crashes"] += crash_result.get("injury_crashes", 0)
+                        
+                        # High risk if fatal crashes
+                        if crash_result.get("fatal_crashes", 0) > 0:
+                            if usdot not in results["high_risk_carriers"]:
+                                results["high_risk_carriers"].append(usdot)
+                        
+                        carrier_result["crashes"] = crash_result
+                    
+                    # Enrich with inspection data if requested
+                    if enrichment_options.get("inspection_data", False):
+                        inspection_result = await asyncio.to_thread(
+                            enricher.enrich_carrier_inspection_data,
+                            usdot
+                        )
+                        results["inspections_created"] += inspection_result.get("inspection_count", 0)
+                        results["violations_created"] += inspection_result.get("violation_count", 0)
+                        carrier_result["inspections"] = inspection_result
                     
                     # Update statistics
                     results["carriers_processed"] += 1
-                    results["policies_created"] += result.get("policies_created", 0)
-                    results["events_created"] += result.get("events_created", 0)
-                    results["gaps_detected"] += result.get("gaps_found", 0)
                     
-                    if result.get("error"):
+                    if carrier_result.get("error"):
                         results["errors"].append({
                             "usdot": usdot,
-                            "error": result["error"],
+                            "error": carrier_result["error"],
                             "timestamp": datetime.now(timezone.utc).isoformat()
                         })
                     
-                    logger.info(f"Enriched carrier {usdot}: {result.get('policies_created', 0)} policies created")
+                    logger.info(f"Enriched carrier {usdot} with requested data types")
                     
                 except Exception as e:
                     logger.error(f"Error enriching carrier {usdot}: {e}")

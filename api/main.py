@@ -15,6 +15,7 @@ from routes.carrier_routes import router as carrier_router
 from routes.insurance_provider_routes import router as insurance_provider_router
 from routes.insurance_routes import router as insurance_router
 from routes.ingest_routes import router as ingest_router
+from routes.safety_routes import router as safety_router
 
 # Configure logging based on settings
 logging.basicConfig(
@@ -203,6 +204,11 @@ app.include_router(
 
 app.include_router(
     ingest_router,
+    dependencies=[Depends(verify_api_key)]
+)
+
+app.include_router(
+    safety_router,
     dependencies=[Depends(verify_api_key)]
 )
 
